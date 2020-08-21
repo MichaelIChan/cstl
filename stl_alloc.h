@@ -92,7 +92,7 @@ void * __malloc_alloc_template<inst>::oom_realloc(void *p, size_t n)
 // 注意, 以下直接将参数 inst 指定为 0
 typedef __malloc_alloc_template<0> malloc_alloc;
 
-/**************************/
+/*******************************************************/
 
 enum {__ALIGN = 8};         // 小型区块的上调边界
 enum {__MAX_BYTES = 128};   // 小型区块的上限
@@ -225,7 +225,7 @@ void* __default_alloc_template<threads, inst>::refill(size_t n)
     // 以下引导 free list 指向新配置的空间(取自内存池)
     *my_free_list = next_obj = (obj *)(chunk + n);
     // 以下将 free list 的各节点串接起来
-    for (int i; ; i++) {        // 从 1 开始, 因为第 0 个将返回给客端
+    for (int i = 1; ; i++) {        // 从 1 开始, 因为第 0 个将返回给客端
         current_obj = next_obj;
         next_obj = (obj *)((char *)next_obj + n);
         if (nobjs - 1 == i) {
