@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "stl_construct.h"
+#include "type_traits.h"
 
 // uninitialized_fill_n() 函数接受三个参数
 // - 迭代器 first 指向欲初始化空间的起始处
@@ -71,7 +72,7 @@ inline ForwardIterator
 __uninitialized_copy(InputIterator first, InputIterator last,
                      ForwardIterator result, T*)
 {
-    typedef typename __type_traits<T1>::is_POD_type is_POD;
+    typedef typename __type_traits<T>::is_POD_type is_POD;
     return __uninitialized_copy_aux(first, last, result, is_POD());
     // 以上, 企图利用 is_POD() 所获得的结果, 让编译器做参数推导
 }
@@ -137,7 +138,7 @@ inline void __uninitialized_fill(Forwarditerator first, Forwarditerator last,
                                  const T& x, T1*)
 {
     typedef typename __type_traits<T1>::is_POD_type is_POD;
-    return __uninitialized_fill_aux(first, last, result, is_POD());
+    return __uninitialized_fill_aux(first, last, x, is_POD());
 }
 
 // 如果 copy construction 等同于 assignment, 而且
