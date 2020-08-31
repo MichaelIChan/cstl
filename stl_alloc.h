@@ -1,3 +1,6 @@
+#ifndef __STL_ALLOC_H
+#define __STL_ALLOC_H
+
 // 第一级配置器 __malloc_alloc_template
 #if 0
 #   include <new>
@@ -5,6 +8,37 @@
 #elif !defined(__THROW_BAD_ALLOC)
 #   include <iostream>
 #   define __THROW_BAD_ALLOC std::cerr << "out of memory" << std::endl; exit(1)
+#endif
+
+#ifdef __STL_THREADS
+# include <stl_threads.h>
+# define __NODE_ALLOCATOR_THREADS true
+# ifdef __STL_SGI_THREADS
+  // We test whether threads are in use before locking.
+  // Perhaps this should be moved into stl_threads.h, but that
+  // probably makes it harder to avoid the procedure call when
+  // it isn't needed.
+    extern "C" {
+      extern int __us_rsthread_malloc;
+    }
+	// The above is copied from malloc.h.  Including <malloc.h>
+	// would be cleaner but fails with certain levels of standard
+	// conformance.
+#   define __NODE_ALLOCATOR_LOCK if (threads && __us_rsthread_malloc) \
+                { _S_node_allocator_lock._M_acquire_lock(); }
+#   define __NODE_ALLOCATOR_UNLOCK if (threads && __us_rsthread_malloc) \
+                { _S_node_allocator_lock._M_release_lock(); }
+# else /* !__STL_SGI_THREADS */
+#   define __NODE_ALLOCATOR_LOCK \
+        { if (threads) _S_node_allocator_lock._M_acquire_lock(); }
+#   define __NODE_ALLOCATOR_UNLOCK \
+        { if (threads) _S_node_allocator_lock._M_release_lock(); }
+# endif
+#else
+//  Thread-unsafe
+#   define __NODE_ALLOCATOR_LOCK
+#   define __NODE_ALLOCATOR_UNLOCK
+#   define __NODE_ALLOCATOR_THREADS false
 #endif
 
 // malloc-based allocator 通常比稍后介绍的 default alloc 速度慢
@@ -305,3 +339,26 @@ chunk_alloc(size_t size, int& nobjs)
         }
     }
 }
+
+#ifdef __USE_MALLOC
+typedef __malloc_alloc_template<0> malloc_alloc;
+typedef malloc_alloc alloc;     // 令 alloc 为第一级配置器
+#else
+// 令 alloc 为第二级配置器
+typedef __default_alloc_template<__NODE_ALLOCATOR_THREADS, 0> alloc;
+#endif
+
+template<class T, class Alloc>
+class simple_alloc {
+public:
+    static T *allocate(size_t n)
+      { return 0 == n ? 0 : (T*) Alloc::allocate(n * sizeof (T)); }
+    static T *allocate(void)
+      { return (T*) Alloc::allocate(sizeof (T)); }
+    static void deallocate(T *p, size_t n)
+      { if (0 != n) Alloc::deallocate(p, n * sizeof (T)); }
+    static void deallocate(T *p)
+      { Alloc::deallocate(p, sizeof (T)); }
+};
+
+#endif

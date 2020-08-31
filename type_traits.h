@@ -1,3 +1,6 @@
+#ifndef __TYPE_TRAITS_H
+#define __TYPE_TRAITS_H
+
 #include "stl_config.h"
 
 struct __true_type { };
@@ -144,3 +147,5 @@ struct __type__traits<T*> {
    typedef __true_type    has_trivial_destructor;
    typedef __true_type    is_POD_type;
 };
+
+#endif

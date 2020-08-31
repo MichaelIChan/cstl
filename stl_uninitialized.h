@@ -1,3 +1,6 @@
+#ifndef __STL_UNINITIALIZED_H
+#define __STL_UNINITIALIZED_H
+
 #include <algorithm>
 
 #include "stl_construct.h"
@@ -166,3 +169,5 @@ __uninitialized_fill_aux(ForwardIterator first, ForwardIterator last,
         construct(&*cur, x);        // 必须一个一个元素地构造, 无法批量进行
     }
 }
+
+#endif
