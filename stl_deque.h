@@ -179,6 +179,30 @@ public:                         // Basic accessors
     size_type max_size() const { return size_type(-1); }
     bool empty() const { return finish == start; }
 
+    void push_back(const value_type& t)
+    {
+        if (finish.cur != finish.last - 1) {
+            // 最后缓冲区尚有两个(含)以上的元素备用空间
+            construct(finish.cur, t);   // 直接在备用空间上构造元素
+            ++finish.cur;               // 调整最后缓冲区的使用状态
+        } else {
+            // 最后缓冲区只剩一个元素备用空间
+            push_back_aux(t);
+        }
+    }
+
+    void push_front(const value_type& t)
+    {
+        if (start.cur != start.first) {
+            // 第一缓冲区尚有备用空间
+            construct(start.cur - 1, t);    // 直接在备用空间上构造元素
+            --start.cur;                    // 调整第一缓冲区的使用状态
+        } else {
+            // 第一缓冲区已无备用空间
+            push_back_aux(t);
+        }
+    }
+
 protected:                      // Internal typedefs
     // 元素的指针的指针
     typedef pointer* map_pointer;
@@ -198,17 +222,57 @@ protected:                      // Data members
 protected:                      // Internal construction/destruction
     enum { initial_map_size = 8 };
 
+    T* allocate_node();
+    void deallocate_node(T*);
+
+    void reserve_map_at_back(size_type nodes_to_add = 1)
+    {
+        if (nodes_to_add + 1 > map_size - (finish.node - map)) {
+            // 如果 map 尾端的节点备用空间不足
+            // 符合以上条件则必须重换一个 map (配置更大的, 拷贝原来的, 释放原来的)
+            reallocate_map(nodes_to_add, false);
+        }
+    }
+    void reserve_map_at_front(size_type nodes_to_add = 1)
+    {
+        if (nodes_to_add > start.node - map) {
+            // 如果 map 前端的节点备用空间不足
+            // 符合以上条件则必须重换一个 map (配置更大的, 拷贝原来的, 释放原来的)
+            reallocate_map(nodes_to_add, true);
+        }
+    }
+
     void fill_initialize(size_type n, const value_type& value);
 
     // 负责产生并安排好 deque 的结构:
     void create_map_and_nodes(size_type num_elements);
-    
+
+    // 只有当 finish.cur == finish.last - 1 时才会被调用
+    // 也就是说, 只有当最后一个缓冲区只剩一个备用元素空间时才会被调用
+    void push_back_aux(const value_type& t);
+
+    // 只有当 start.cur == start.last 时才会被调用
+    // 也就是说, 只有当第一个缓冲区没有任何备用元素时才会被调用
+    void push_front_aux(const value_type& t);
+
+    void reallocate_map(size_type nodes_to_add, bool add_at_front);
 };
 
 template <class T, class Alloc, size_t BufSize>
 void deque<T, Alloc, BufSize>::fill_initialize(size_type n, const value_type& value)
 {
+    create_map_and_nodes(n);    // 把 deque 的结构都产生并安排好
+    map_pointer cur;
+    __STL_TRY {
+        // 为每个节点缓冲区设定初值
+        for (cur = start.node; cur < finish.node; ++cur) {
+            uninitialized_fill(*cur, *cur + __deque_buf_size(BufSize, sizeof(T)), value);
+        }
+        // 最后一个节点的设定稍有不同(因为尾端可能有备用空间, 不必设初值)
+        uninitialized_fill(finish.first, finish.cur, value);
+    } catch(...) {
 
+    }
 }
 
 template <class T, class Alloc, size_t BufSize>
@@ -247,6 +311,74 @@ void deque<T, Alloc, BufSize>::create_map_and_nodes(size_type num_elements)
     finish.cur = finish.first + num_elements % __deque_buf_size(BufSize, sizeof(T));
     // 前面说过, 如果刚好整除, 会多配一个节点
     // 此时即令 cur 指向这多配的一个节点(所对映之缓冲区)的起始处
+}
+
+template <class T, class Alloc, size_t BufSize>
+void deque<T, Alloc, BufSize>::push_back_aux(const value_type& t)
+{
+    value_type t_copy = t;
+    reserve_map_at_back();      // 若符合某种条件则必须重换一个 map
+    *(finish.node + 1) = allocate_node();   // 配置一个新节点(缓冲区)
+    __STL_TRY {
+        construct(finish.cur, t_copy);      // 针对标的元素设值
+        finish.set_node(finish.node + 1);   // 改变 finish, 令其指向新节点
+        finish.cur = finish.first;          // 设定 finish 的状态
+    } 
+    __STL_UNWIND(deallocate_node(*(finish.node + 1)));
+}
+
+template <class T, class Alloc, size_t BufSize>
+void deque<T, Alloc, BufSize>::push_front_aux(const value_type& t)
+{
+    value_type t_copy = t;
+    reserve_map_at_front();     // 若符合某种条件则必须重换一个 map
+    *(start.node - 1) = allocate_node();    // 配置一个新节点(缓冲区)
+    __STL_TRY {
+        start.set_node(start.node - 1);     // 改变 start, 令其指向新节点
+        start.cur = start.last - 1;         // 设定 start 的状态
+        construct(start.cur, t_copy);       // 针对标的元素设值
+    } catch(...) {
+        // "commit or rollback" 语意: 若非全部成功, 就一个都不留
+        start.set_node(start.node + 1);
+        start.cur = start.first;
+        deallocate_node(*(start.node - 1));
+        throw;
+    }
+}
+
+template <class T, class Alloc, size_t BufSize>
+void deque<T, Alloc, BufSize>::reallocate_map(size_type nodes_to_add, bool add_at_front)
+{
+    size_type old_num_nodes = finish.node - start.node + 1;
+    size_type new_num_nodes = old_num_nodes + nodes_to_add;
+
+    map_pointer new_nstart;
+    if (map_size > 2 * new_num_nodes) {
+        new_nstart = map + (map - new_num_nodes / 2)
+                         + (add_at_front ? nodes_to_add : 0);
+        if (new_nstart < start.node) {
+            copy(start.node, finish.node + 1, new_nstart);
+        } else {
+            copy_backward(start.node, finish.node + 1, new_nstart + old_num_nodes);
+        }
+    } else {
+        size_type new_map_size = map_size + std::max(map_size, nodes_to_add) + 2;
+        // 配置一块空间, 准备给新 map 使用
+        map_pointer new_map = map_allocator::allocate(new_map_size);
+        new_nstart = new_map + (new_map_size - new_num_nodes) / 2
+                             + (add_at_front ? nodes_to_add : 0);
+        // 把原 map 内容拷贝过来
+        copy(start.node, finish.node + 1, new_nstart);
+        // 释放原 map
+        map_allocator::deallocate(map, map_size);
+        // 设定新 map 的起始地址与大小
+        map = new_map;
+        map_size = new_map_size;
+    }
+
+    // 重新设定迭代器 start 和 finish
+    start.set_node(new_nstart);
+    finish.set_node(new_nstart + old_num_nodes - 1);
 }
 
 #endif
