@@ -203,6 +203,30 @@ public:                         // Basic accessors
         }
     }
 
+    void pop_back()
+    {
+        if (finish.cur != finish.first) {
+            // 最后缓冲区有一个(或更多)元素
+            --finish.cur;           // 调整指针, 相当于排除了最后元素
+            destory(finish.cur);    // 将最后元素析构
+        } else {
+            // 最后缓冲区没有任何元素
+            pop_back_aux();         // 这里将进行缓冲区的释放工作
+        }
+    }
+
+    void pop_front()
+    {
+        if (start.cur != start.last - 1) {
+            // 第一缓冲区有两个(或更多)元素
+            destory(start.cur);     // 将第一元素析构
+            ++start.cur;            // 调整指针, 相当于排除了第一元素
+        } else {
+            // 第一缓冲区仅有一个元素
+            pop_front_aux();        // 这里将进行缓冲区的释放工作
+        }
+    }
+
 protected:                      // Internal typedefs
     // 元素的指针的指针
     typedef pointer* map_pointer;
@@ -254,6 +278,12 @@ protected:                      // Internal construction/destruction
     // 只有当 start.cur == start.last 时才会被调用
     // 也就是说, 只有当第一个缓冲区没有任何备用元素时才会被调用
     void push_front_aux(const value_type& t);
+
+    // 只有当 finish.cur == finish.first 时才会被调用
+    void pop_back_aux();
+
+    // // 只有当 start.cur == start.last - 1 时才会被调用
+    void pop_front_aux();
 
     void reallocate_map(size_type nodes_to_add, bool add_at_front);
 };
@@ -379,6 +409,24 @@ void deque<T, Alloc, BufSize>::reallocate_map(size_type nodes_to_add, bool add_a
     // 重新设定迭代器 start 和 finish
     start.set_node(new_nstart);
     finish.set_node(new_nstart + old_num_nodes - 1);
+}
+
+template <class T, class Alloc, size_t BufSize>
+void deque<T, Alloc, BufSize>::pop_back_aux()
+{
+    deallocate_node(finish.first);      // 释放最后一个缓冲区
+    finish.set_node(finish.node - 1);   // 调整 finish 的状态, 使指向
+    finish.cur = finish.last - 1;       // 上一个缓冲区的最后一个元素
+    destroy(finish.cur);                // 将该元素析构
+}
+
+template <class T, class Alloc, size_t BufSize>
+void deque<T, Alloc, BufSize>::pop_front_aux()
+{
+    destory(start.cur);                 // 将第一缓冲区的第一个(也是最后一个, 唯一一个)元素析构
+    deallocate_node(start.first);       // 释放第一缓冲区
+    start.set_node(start.node + 1);     // 调整 start 的状态, 使指向
+    start.cur = start.first;            // 下一个缓冲区的第一个元素
 }
 
 #endif
