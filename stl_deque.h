@@ -151,10 +151,11 @@ public:
     typedef __deque_iterator<T, T&, T*, BufSiz> iterator;
 
 public:                         // Basic accessors
+
     deque(int n, const value_type& value)
         : start(), finish(), map(0), map_size(0)
     {
-
+        fill_initialize(n, value);
     }
 
     iterator begin() { return start; }
@@ -227,6 +228,33 @@ public:                         // Basic accessors
         }
     }
 
+    // 清除整个 deque, 注意, 最终需要保留一个缓冲区.
+    // 这是 deque 的策略, 也是 deque 的初始状态
+    void clear();
+
+    // 清除 pos 所指的元素. pos 为清除点
+    iterator erase(iterator pos);
+
+    // 清除 [first, last) 区间内的所有元素
+    iterator erase(iterator first, iterator last);
+
+    // 在 position 处插入一个元素, 其值为 x
+    iterator insert(iterator position, const value_type& x)
+    {
+        if (position.cur == start.cur) {            // 如果插入点是 deque 最前端
+            push_front(x);  // 交给 push_front 去做
+            return start;
+        } else if (position.cur == finish.cur) {    // 如果插入点是 deque 最尾端
+            push_back(x);   // 交给 push_back 去做
+            iterator tmp = finish;
+            --tmp;
+            return tmp;
+        } else {
+            return insert_aux(position, x);         // 交给 insert_aux 去做
+        }
+    }
+    
+
 protected:                      // Internal typedefs
     // 元素的指针的指针
     typedef pointer* map_pointer;
@@ -284,6 +312,8 @@ protected:                      // Internal construction/destruction
 
     // // 只有当 start.cur == start.last - 1 时才会被调用
     void pop_front_aux();
+
+    iterator insert_aux(iterator pos, const value_type& x);
 
     void reallocate_map(size_type nodes_to_add, bool add_at_front);
 };
@@ -427,6 +457,111 @@ void deque<T, Alloc, BufSize>::pop_front_aux()
     deallocate_node(start.first);       // 释放第一缓冲区
     start.set_node(start.node + 1);     // 调整 start 的状态, 使指向
     start.cur = start.first;            // 下一个缓冲区的第一个元素
+}
+
+template <class T, class Alloc, size_t BufSize>
+void deque<T, Alloc, BufSize>::clear()
+{
+    // 以下针对头尾以外的每一个缓冲区
+    for (map_pointer node = start.node + 1; node < finish.node; ++node) {
+        // 将缓冲区内的所有元素析构. 注意, 调用的是 destory() 第二版本
+        destory(*node, *node + __deque_buf_size(BufSize, sizeof(T)));
+        // 释放缓冲区内存
+        data_allocator::deallocate(*node, __deque_buf_size(BufSize, sizeof(T)));
+    }
+
+    if (start.node != finish.node) {    // 至少有头尾两个缓冲区
+        destory(start.cur, start.last);     // 将头缓冲区的目前所有元素析构
+        destory(finish.first, finish.cur);  // 将尾缓冲区的目前所有元素析构
+        // 以下释放尾缓冲区, 头缓冲区保留
+        data_allocator::deallocate(finish.first, __deque_buf_size(BufSize, sizeof(T)));
+    } else {    // 只有一个缓冲区
+        destory(start.cur, finish.cur);     // 将此唯一缓冲区内的所有元素析构
+        // 并不释放缓冲区, 保留这唯一的缓冲区
+    }
+
+    finish = start; // 调整状态
+}
+
+template <class T, class Alloc, size_t BufSize>
+typename deque<T, Alloc, BufSize>::iterator deque<T, Alloc, BufSize>::erase(iterator pos)
+{
+    iterator next = pos;
+    ++next;
+    difference_type index = pos - start;    // 清除点之前的元素个数
+    if (index < (size() >> 1)) {            // 如果清除点之前的元素比较少
+        copy_backward(start, pos, next);    // 就移动清除点之前的元素
+        pop_front();                        // 移动完毕, 最前一个元素冗余, 去除之
+    } else {                        // 清除点之后点元素比较少
+        copy(next, finish, pos);    // 就移动清除点之后的元素
+        pop_back();                 // 移动完毕, 最后一个元素冗余, 去除之
+    }
+    return start + index;
+}
+
+template <class T, class Alloc, size_t BufSize>
+typename deque<T, Alloc, BufSize>::iterator
+deque<T, Alloc, BufSize>::erase(iterator first, iterator last)
+{
+    if (first == start && last == finish) {
+        // 如果清除区间就是整个 deque, 直接调用 clear() 即可
+        clear();
+        return finish;
+    } else {
+        difference_type n = last - first;               // 清除区间的长度
+        difference_type elems_before = first - start;   // 清除区间前方的元素个数
+        if (elems_before < (size() - n) / 2) {          // 如果前方的元素比较少
+            copy_backword(start, first, last);          // 向后移动前方元素(覆盖清除区间)
+            iterator new_start = start + n;             // 标记 deque 的新起点
+            destory(start, new_start);                  // 移动完毕, 将冗余的元素析构
+
+            // 以下将冗余的缓冲区释放
+            for (map_pointer cur = start.node; cur < new_start.node; ++cur) {
+                data_allocator::deallocate(*cur, __deque_buf_size(BufSize, sizeof(T)));
+            }
+            start = new_start;  // 设定 deque 的新起点
+        } else {    // 如果清除区间后方的元素比较少
+            copy(last, finish, first);          // 向前移动后方元素(覆盖清除区间)
+            iterator new_finish = finish - n;   // 标记 deque 的新尾点
+            destory(new_finish, finish);        // 移动完毕, 将冗余的元素析构
+
+            // 以下将冗余的缓冲区释放
+            for (map_pointer cur = new_finish.node + 1; cur <= finish.node; ++cur) {
+                data_allocator::deallocate(*cur, __deque_buf_size(BufSize, sizeof(T)));
+            }
+            finish = new_finish;  // 设定 deque 的新尾点
+        }
+        return start + elems_before;
+    }
+}
+
+template <class T, class Alloc, size_t BufSize>
+typename deque<T, Alloc, BufSize>::iterator
+deque<T, Alloc, BufSize>::insert_aux(iterator pos, const value_type& x)
+{
+    difference_type index = pos - start;    // 插入点之前的元素个数
+    value_type x_copy = x;
+    if (index < size() / 2) {       // 如果插入点之前的元素个数比较少
+        push_front(front());        // 在最前端加入与第一元素同值的元素
+        iterator front1 = start;    // 以下标示记号, 然后进行元素移动
+        ++front1;
+        iterator front2 = front1;
+        ++front2;
+        pos = start + index;
+        iterator pos1 = pos;
+        +pos1;
+        copy(front2, pos1, front1); // 元素移动
+    } else {                        // 插入点之后的元素个数比较少
+        push_back(back());          // 在最尾端加入与最后元素同值的元素
+        iterator back1 = finish;    // 以下标示记号, 然后进行元素移动
+        --back1;
+        iterator back2 = back1;
+        --back2;
+        pos = start + index;
+        copy_backward(pos, back2, back1);   // 元素移动
+    }
+    *pos = x_copy;      // 在插入点上设定新值
+    return pos;
 }
 
 #endif
