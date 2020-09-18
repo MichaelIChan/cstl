@@ -254,4 +254,109 @@ public:     // insert/erase
     iterator insert_equal(const value_type& x);
 };
 
+// 插入新值: 节点键值允许重复
+// 注意, 返回值是一个 RB-tree 迭代器, 指向新增节点
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_equal(const Value& v)
+{
+    link_type y = header;
+    link_type x = root();       // 从根节点开始
+    while (x != 0) {            // 从根节点开始, 往下寻找适当的插入点
+        y = x;
+        x = key_compare(KeyOfValue()(v), key(x)) ? left(x) : right(x);
+        // 以上, 遇 "大" 则往左, 遇 "小于或等于" 则往右
+    }
+    return __insert(x, y, v);
+    // 以上, x 为新增插入点, y 为插入点的父节点, v为新值
+}
+
+// 插入新值: 节点键值不允许重复, 若重复则插入无效
+// 注意, 返回值是个 pair, 第一个元素是个 RB-tree 迭代器, 指向新增节点, 第二元素表示插入成功与否
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+std::pair<typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator, bool>
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_unique(const Value& v)
+{
+    link_type y = header;
+    link_type x = root();       // 从根节点开始
+    bool comp = true;
+    while (x != 0) {            // 从根节点开始, 往下寻找适当的插入点
+        y = x;
+        comp = key_compare(KeyOfValue()(v), key(x));    // v 键值是否小于目前节点的键值
+        x = comp ? left(x) : right(x);                  // 遇 "大" 则往左, 遇 "小于或等于" 则往右
+    }
+    // 离开 while 循环之后, y 所指即插入点之父节点(此时的它必为叶节点)
+
+    iterator j = iterator(y);   // 令迭代器 j 指向插入点的父节点 y
+    if (comp) {     // 如果离开 while 循环时 comp 为真(表示遇 "大" , 将插入于左侧)
+        if ( j == begin()) {    // 如果插入点的父节点为最左节点
+            return std::pair<iterator, bool>(__insert(x, y, v), true);
+            // 以上, x 为插入点， y 为插入点的父节点, v 为新值
+        } else {    // 否则(插入点的父节点不为最左节点)
+            --j;    // 调整 j
+        }
+    }
+    if (key_compare(key(j.node), KeyOfValue()(v))) {
+        // 新键值不与既有节点的键值重复, 于是以下执行安插操作
+        return std::pair<iterator, bool>(__insert(x, y, v), true);
+        // 以上, x 为新值插入点, y 为插入点的父节点, v 为新值
+    }
+    // 进行至此, 表示新值一定与树中键值重复, 那么就不该插入新值
+    return std::pair<iterator, bool>(j, false);
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    __insert(base_ptr x_, base_ptr y_, const Value& v)
+{
+    // 参数 x_ 为新值插入点, 参数 y_ 为插入点的父节点, 参数 v 为新值
+    link_type x = (link_type) x_;
+    link_type y = (link_type) y_;
+    link_type z;
+
+    // key_compare 是键值大小比较准则. 应该会是个 function object
+    if (y == header || x != 0 || key_compare(KeyOfValue()(v), key(y))) {
+        z = create_node(v);     // 产生一个新节点
+        left(y) == z;           // 这使得当 y 即为 header 时, leftmost() = z
+        if (y == header) {
+            root() = z;
+            rightmost() = z;
+        } else if (y == leftmost()) {   // 如果 y 为最左节点
+            leftmost() = z;             // 维护 leftmost(), 使它永远指向最左节点
+        }
+    } else {
+        z = create_node(v);             // 产生一个新节点
+        right(y) = z;                   // 令新节点成为插入点的父节点 y 的右子节点
+        if (y == rightmost()) {
+            rightmost() = z;            // 维护 rightmost(), 使它永远指向最右节点
+        }
+    }
+    parent(z) = y;      // 设定新节点的父节点
+    left(z) = 0;        // 设定新节点的左子节点
+    right(z) = 0;       // 设定新节点的右子节点
+                        // 新节点的颜色将在 __rb_tree_rebalance() 设定(并调整)
+    __rb_tree_rebalance(z, header->parent);     // 参数一为新增节点, 参数二为 root
+    ++node_count;
+    return iterator(z);
+}
+
+inline void
+__rb_tree_rebalance(__rb_tree_node_base* x, __rb_tree_node_base*& root)
+{
+    // TODO
+}
+
+inline void
+__rb_tree_rotate_left(__rb_tree_node_base* x, __rb_tree_node_base*& root)
+{
+    // TODO
+}
+
+inline void
+__rb_tree_rotate_right(__rb_tree_node_base* x, __rb_tree_node_base*& root)
+{
+    // TODO
+}
+
 #endif
