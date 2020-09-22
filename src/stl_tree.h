@@ -242,10 +242,11 @@ public:     // allocation/deallocation
 public:     // accessors
     Compare key_comp() const { return key_compare; }
     iterator begin() { return leftmost(); }     // RB 树的起头为最左(最小)节点处
-    iterator eng() { return header; }           // RB 树的终点为 header 所指处
+    iterator end() { return header; }           // RB 树的终点为 header 所指处
     bool empty() const { return node_count == 0; }
     size_type size() const { return node_count; }
     size_type max_size() const { return size_type(-1); }
+    iterator find(const Key& k);
 
 public:     // insert/erase
     // 将 x 插入到 RB-tree 中 (保持节点值独一无二)
@@ -341,22 +342,107 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
     return iterator(z);
 }
 
-inline void
-__rb_tree_rebalance(__rb_tree_node_base* x, __rb_tree_node_base*& root)
-{
-    // TODO
-}
-
+// 全局函数
+// 新节点必为红节点. 如果插入处的父节点亦为红节点, 就违反红黑树规则,
+// 此时可能需要做树形旋转(及颜色改变, 在程序其它处)
 inline void
 __rb_tree_rotate_left(__rb_tree_node_base* x, __rb_tree_node_base*& root)
 {
-    // TODO
+    // x 为旋转点
+    __rb_tree_node_base* y = x->right;  // 令 y 为旋转点的右子节点
+    x->right = y->left;
+    if (y->left != 0) {
+        y->left->parent = x;    // 回马枪设定父节点
+    }
+    y->parent = x->parent;
+
+    // 令 y 完全顶替 x 的地位(必须将 x 对其父节点的关系完全接收过来)
+    if ( x == root) {                       // x 为根节点
+        root = y;
+    } else if (x == x->parent->left) {      // x 为其父节点的左子节点
+        x->parent->left = y;
+    } else {                                // x 为其父节点的右子节点
+        x->parent->right = y;
+    }
+    y->left = x;
+    x->parent = y;
 }
 
+// 全局函数
+// 新节点必为红节点. 如果插入处的父节点亦为红节点, 就违反红黑树规则,
+// 此时可能需要做树形旋转(及颜色改变, 在程序其它处)
 inline void
 __rb_tree_rotate_right(__rb_tree_node_base* x, __rb_tree_node_base*& root)
 {
-    // TODO
+    // x 为旋转点
+    __rb_tree_node_base* y = x->left;       // y 为旋转点的左子节点
+    x->left = y->right;
+    if (y->right != 0) {
+        y->right->parent = x;   // 回马枪设定父节点
+    }
+    y->parent = x->parent;
+
+    // 令 y 完全顶替 x 的地位(必须将 x 对其父节点的关系完全接收过来)
+    if ( x == root) {                       // x 为根节点
+        root = y;
+    } else if (x == x->parent->right) {      // x 为其父节点的右子节点
+        x->parent->right = y;
+    } else {                                // x 为其父节点的左子节点
+        x->parent->left = y;
+    }
+    y->right = x;
+    x->parent = y;
 }
 
 #endif
+
+// 全局函数
+// 重新令树形平衡(改变颜色及旋转树形)
+// 参数一为新增节点, 参数二为 root
+inline void
+__rb_tree_rebalance(__rb_tree_node_base* x, __rb_tree_node_base*& root)
+{
+    x->color = __rb_tree_red;       // 新节点必为红
+    while (x != root && x->parent->color == __rb_tree_red) {    // 父节点为红
+        if (x->parent == x->parent->parent->left) {             // 父节点为祖父节点的左子节点
+            __rb_tree_node_base* y = x->parent->parent->right;  // 令 y 为伯父节点
+            if (y && y->color == __rb_tree_red) {               // 伯父节点存在, 且为红
+                x->parent->color = __rb_tree_black;             // 更改父节点为黑
+                y->color = __rb_tree_black;                     // 更改伯父节点为黑
+                x->parent->parent->color = __rb_tree_red;       // 更改祖父节点为红
+                x = x->parent->parent;
+            } else {    // 无伯父节点, 或伯父节点为黑
+                if (x == x->parent->left) {             // 如果新节点为父节点的左子节点
+                    x = x->parent;
+                    __rb_tree_rotate_right(x, root);    // 第一参数为右旋点
+                }
+                x->parent->color = __rb_tree_black;     // 改变颜色
+                x->parent->parent->color = __rb_tree_red;
+                __rb_tree_rotate_left(x->parent->parent, root); // 第一参数为左旋点
+            }
+        }
+    }
+    root->color = __rb_tree_black;      // 根节点永远为黑
+}
+
+// 寻找 RB 树中是否有键值为 k 的节点
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::find(const Key& k)
+{
+    link_type y = header;       // Last node which is not less than k.
+    link_type x = root();       // Current node.
+
+    while (x != 0) {
+        // 以下, key_compare 是节点键值大小比较准则. 应该会是个 function object
+        if (!key_compare(key(x), k)) {
+            // x 键值大于 k, 遇到大值向左走
+            y = x, x = left(x);
+        } else {
+            // x 键值小于 k, 遇到小值向右走
+            x = right(x);
+        }
+    }
+    iterator j = iterator(y);
+    return (j == end() || key_compare(k, key(j.node))) ? end() : j;
+}
