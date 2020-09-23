@@ -412,16 +412,32 @@ __rb_tree_rebalance(__rb_tree_node_base* x, __rb_tree_node_base*& root)
                 x->parent->parent->color = __rb_tree_red;       // 更改祖父节点为红
                 x = x->parent->parent;
             } else {    // 无伯父节点, 或伯父节点为黑
-                if (x == x->parent->left) {             // 如果新节点为父节点的左子节点
+                if (x == x->parent->right) {            // 如果新节点为父节点的右子节点
+                    x = x->parent;
+                    __rb_tree_rotate_left(x, root);     // 第一参数为左旋点
+                }
+                x->parent->color = __rb_tree_black;     // 改变颜色
+                x->parent->parent->color = __rb_tree_red;
+                __rb_tree_rotate_right(x->parent->parent, root); // 第一参数为右旋点
+            }
+        } else {    // // 父节点为祖父节点的右子节点
+            __rb_tree_node_base* y = x->parent->parent->left;   // 令 y 为伯父节点
+            if (y && y->color == __rb_tree_red) {           // 有伯父节点, 且为红
+                x->parent->color = __rb_tree_black;         // 更改父节点为黑
+                y->color = __rb_tree_black;                 // 更改伯父节点为黑
+                x->parent->parent->color = __rb_tree_red;   // 更改祖父节点为红
+                x = x->parent->parent;      // 准备继续往上层检查
+            } else {        // 无伯父节点, 或伯父节点为黑
+                if (x == x->parent->left) {         // 如果新节点为父节点的左子节点
                     x = x->parent;
                     __rb_tree_rotate_right(x, root);    // 第一参数为右旋点
                 }
                 x->parent->color = __rb_tree_black;     // 改变颜色
                 x->parent->parent->color = __rb_tree_red;
-                __rb_tree_rotate_left(x->parent->parent, root); // 第一参数为左旋点
+                __rb_tree_rotate_left(x->parent->parent, root);     // 第一参数为左旋点
             }
         }
-    }
+    } // while end
     root->color = __rb_tree_black;      // 根节点永远为黑
 }
 
