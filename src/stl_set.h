@@ -46,7 +46,6 @@ public:
     set() : t(Compare()) { }
     explicit set(const Compare& comp) : t(comp) { }
 
-    // insert_unique(iterator&, iterator&) has not been finished
     template <class InputIterator>
     set(InputIterator first, InputIterator last)
         : t(Compare()) { t.insert_unique(first, last); }
@@ -62,7 +61,22 @@ public:
         return *this;
     }
 
-    // this is not been finished
+    // 以下所有的 set 操作行为, RB-tree 都已提供, 所以 set 只要传递调用即可
+
+    // accessors;
+    key_compare key_comp() const { return t.key_comp(); }
+    // 以下注意, set 的 value_comp() 事实上为 RB-tree 的 key_comp()
+    value_compare value_comp() const { return t.key_comp(); }
+    iterator begin() const { return t.begin(); }
+    iterator end() const { return t.end(); }
+    reverse_iterator rbegin() const { return t.rbegin(); }
+    reverse_iterator rend() const { return t.rend(); }
+    bool empty() const { return t.empty(); }
+    size_type size() const { return t.size(); }
+    size_type max_size() const { return t.max_size(); }
+    void swap(set<Key, Compare, Alloc>& x) { t.swap(x.t); }
+
+    // insert/erase
 };
 
 #endif
