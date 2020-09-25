@@ -124,6 +124,16 @@ struct __rb_tree_iterator : public __rb_tree_base_iterator {
     self operator--(int) { self tmp = *this; decrement(); return tmp; }
 };
 
+inline bool operator==(const __rb_tree_base_iterator& x, const __rb_tree_base_iterator& y)
+{
+    return x.node == y.node;
+}
+
+inline bool operator!=(const __rb_tree_base_iterator& x, const __rb_tree_base_iterator& y)
+{
+    return x.node != y.node;
+}
+
 template <class Key, class Value, class KeyOfValue, class Compare, class Alloc = alloc>
 class rb_tree {
 protected:
@@ -213,6 +223,18 @@ public:
     typedef __rb_tree_iterator<value_type, reference, pointer> iterator;
     typedef __rb_tree_iterator<value_type, const_reference, const_pointer> const_iterator;
 
+#ifdef __STL_CLASS_PARTIAL_SPECIALIZATION
+    typedef reverse_iterator<const_iterator> const_reverse_iterator;
+    typedef reverse_iterator<iterator> reverse_iterator;
+#else /* __STL_CLASS_PARTIAL_SPECIALIZATION */
+    typedef reverse_bidirectional_iterator<iterator, value_type, reference,
+                                         difference_type>
+          reverse_iterator; 
+    typedef reverse_bidirectional_iterator<const_iterator, value_type,
+                                         const_reference, difference_type>
+          const_reverse_iterator;
+#endif /* __STL_CLASS_PARTIAL_SPECIALIZATION */ 
+
 private:
     iterator __insert(base_ptr x, base_ptr y, const value_type& v);
     link_type __copy(link_type x, link_type p);
@@ -243,9 +265,24 @@ public:     // accessors
     Compare key_comp() const { return key_compare; }
     iterator begin() { return leftmost(); }     // RB 树的起头为最左(最小)节点处
     iterator end() { return header; }           // RB 树的终点为 header 所指处
+    reverse_iterator rbegin() { return reverse_iterator(end()); }
+    const_reverse_iterator rbegin() const
+    { 
+        return const_reverse_iterator(end()); 
+    }
+    reverse_iterator rend() { return reverse_iterator(begin()); }
+    const_reverse_iterator rend() const
+    { 
+        return const_reverse_iterator(begin());
+    }
     bool empty() const { return node_count == 0; }
     size_type size() const { return node_count; }
     size_type max_size() const { return size_type(-1); }
+    void swap(rb_tree<Key, Value, KeyOfValue, Compare, Alloc>& t) {
+        std::swap(header, t._M_header);
+        std::swap(node_count, t._M_node_count);
+        std::swap(key_compare, t._M_key_compare);
+    }
     iterator find(const Key& k);
 
 public:     // insert/erase
@@ -253,6 +290,8 @@ public:     // insert/erase
     std::pair<iterator, bool> insert_unique(const value_type& x);
     // 将 x 插入到 RB-tree 中 (允许节点值重复)
     iterator insert_equal(const value_type& x);
+
+    void insert_unique(const_iterator first, const_iterator last);
 };
 
 // 插入新值: 节点键值允许重复
@@ -304,6 +343,14 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_unique(const Value& v)
     }
     // 进行至此, 表示新值一定与树中键值重复, 那么就不该插入新值
     return std::pair<iterator, bool>(j, false);
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+void rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    insert_unique(const_iterator first, const_iterator last)
+{
+    for (; first != last; ++first)
+        insert_unique(*first);
 }
 
 template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
