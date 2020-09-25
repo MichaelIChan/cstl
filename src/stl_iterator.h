@@ -125,4 +125,59 @@ inline void advance(InputIterator& i, Distance n)
     __advance(i, n, iterator_category(i));
 }
 
+#ifndef __STL_LIMITED_DEFAULT_TEMPLATES
+template <class _BidirectionalIterator, class _Tp, class _Reference = _Tp&, 
+          class _Distance = ptrdiff_t> 
+#else
+template <class _BidirectionalIterator, class _Tp, class _Reference, 
+          class _Distance> 
+#endif
+class reverse_bidirectional_iterator {
+    typedef reverse_bidirectional_iterator<_BidirectionalIterator, _Tp, 
+                                         _Reference, _Distance>  _Self;
+protected:
+    _BidirectionalIterator current;
+public:
+    typedef bidirectional_iterator_tag iterator_category;
+    typedef _Tp                        value_type;
+    typedef _Distance                  difference_type;
+    typedef _Tp*                       pointer;
+    typedef _Reference                 reference;
+
+    reverse_bidirectional_iterator() {}
+    explicit reverse_bidirectional_iterator(_BidirectionalIterator __x)
+        : current(__x) {}
+    _BidirectionalIterator base() const { return current; }
+    _Reference operator*() const
+    {
+        _BidirectionalIterator __tmp = current;
+        return *--__tmp;
+    }
+#ifndef __SGI_STL_NO_ARROW_OPERATOR
+    pointer operator->() const { return &(operator*()); }
+#endif /* __SGI_STL_NO_ARROW_OPERATOR */
+    _Self& operator++()
+    {
+        --current;
+        return *this;
+    }
+    _Self operator++(int)
+    {
+        _Self __tmp = *this;
+        --current;
+        return __tmp;
+    }
+    _Self& operator--()
+    {
+        ++current;
+        return *this;
+    }
+    _Self operator--(int)
+    {
+        _Self __tmp = *this;
+        ++current;
+        return __tmp;
+    }
+};
+
 #endif
