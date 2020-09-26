@@ -239,7 +239,7 @@ private:
     iterator __insert(base_ptr x, base_ptr y, const value_type& v);
     link_type __copy(link_type x, link_type p);
     void __erase(link_type x);
-    void clear();
+
     void init()
     {
         header = get_node();            // 产生一个节点空间, 令 header 指向它
@@ -278,21 +278,74 @@ public:     // accessors
     bool empty() const { return node_count == 0; }
     size_type size() const { return node_count; }
     size_type max_size() const { return size_type(-1); }
-    void swap(rb_tree<Key, Value, KeyOfValue, Compare, Alloc>& t) {
+    void swap(rb_tree<Key, Value, KeyOfValue, Compare, Alloc>& t)
+    {
         std::swap(header, t._M_header);
         std::swap(node_count, t._M_node_count);
         std::swap(key_compare, t._M_key_compare);
     }
+
+public:     // set operations
     iterator find(const Key& k);
+    const_iterator find(const Key& k) const;
+    size_type count(const Key& k) const;
+    iterator lower_bound(const Key& k);
+    const_iterator lower_bound(const Key& k) const;
+    iterator upper_bound(const Key& k);
+    const_iterator upper_bound(const Key& k) const;
+    std::pair<iterator,iterator> equal_range(const Key& k);
+    std::pair<const_iterator, const_iterator> equal_range(const Key& k) const;
 
 public:     // insert/erase
     // 将 x 插入到 RB-tree 中 (保持节点值独一无二)
-    std::pair<iterator, bool> insert_unique(const value_type& x);
+    std::pair<iterator, bool> insert_unique(const value_type& v);
+    iterator insert_unique(iterator position, const value_type& v);
+    void insert_unique(const_iterator first, const_iterator last);
     // 将 x 插入到 RB-tree 中 (允许节点值重复)
     iterator insert_equal(const value_type& x);
 
-    void insert_unique(const_iterator first, const_iterator last);
+    void erase(iterator position);
+    size_type erase(const key_type& V);
+    void erase(iterator first, iterator last);
+    void erase(const key_type* first, const key_type* last);
+
+    void clear()
+    {
+        if (node_count != 0) {
+            __erase(root());
+            leftmost() = header;
+            root() = 0;
+            rightmost() = header;
+            node_count = 0;
+        }
+    }
 };
+
+template <class _Key, class _Value, class _KeyOfValue, class _Compare, class _Alloc>
+inline bool 
+operator==(const rb_tree<_Key,_Value,_KeyOfValue,_Compare,_Alloc>& __x, 
+const rb_tree<_Key,_Value,_KeyOfValue,_Compare,_Alloc>& __y)
+{
+  return __x.size() == __y.size() &&
+         equal(__x.begin(), __x.end(), __y.begin());
+}
+
+template <class _Key, class _Value, class _KeyOfValue, class _Compare, class _Alloc>
+inline bool 
+operator<(const rb_tree<_Key,_Value,_KeyOfValue,_Compare,_Alloc>& __x, 
+          const rb_tree<_Key,_Value,_KeyOfValue,_Compare,_Alloc>& __y)
+{
+  return lexicographical_compare(__x.begin(), __x.end(), 
+                                 __y.begin(), __y.end());
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+inline bool 
+operator!=(const rb_tree<Key, Value, KeyOfValue, Compare, Alloc>& __x, 
+           const rb_tree<Key, Value, KeyOfValue, Compare, Alloc>& __y)
+{
+    return !(__x == __y);
+}
 
 // 插入新值: 节点键值允许重复
 // 注意, 返回值是一个 RB-tree 迭代器, 指向新增节点
@@ -356,6 +409,80 @@ void rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
 template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
 typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
 rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    insert_unique(iterator position, const Value& v)
+{
+    if (position.node == header->left) {    // begin()
+        if (size() > 0 && key_compare(KeyOfValue()(v), key(position.node))) {
+            return __insert(position.node, position.node, v);
+        } else {
+            return insert_unique(v).first;
+        }
+    } else if (position.node == header) {   // end()
+        if (key_compare(key(rightmost()), KeyOfValue()(v))) {
+            return __insert(0, rightmost(), v);
+        } else {
+            return insert_unique(v).first;
+        }
+    } else {
+        iterator before = position;
+        --before;
+        if (key_compare(Key(before.node), KeyOfValue()(v))
+            && key_compare(KeyOfValue()(v), Key(position.node))) {
+            if (right(before.node) == 0) {
+                return __insert(0, before.node, v);
+            } else {
+                return __insert(position.node, position.node, v);
+            }
+        } else {
+            return insert_unique(v).first;
+        }
+    }
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+void rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    erase(iterator position)
+{
+    link_type y = (link_type) __rb_tree_rebalance_for_erase(position.node,
+                                                            header->parent,
+                                                            header->left,
+                                                            header->right);
+    destory_node(y);
+    --node_count;
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::size_type
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::erase(const key_type& k)
+{
+    std::pair<iterator, iterator> p = equal_range(k);
+    size_type n = 0;
+    std::distance(p.first, p.second, n);
+    erase(p.first, p.second);
+    return n;
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+void rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    erase(iterator first, iterator last)
+{
+    if (first == begin() && last == end()) {
+        clear();
+    } else {
+        while ( first != last) erase(first++);
+    }
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+void rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    erase(const key_type* first, const key_type* last)
+{
+    while (first != last) erase(*first++);
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
     __insert(base_ptr x_, base_ptr y_, const Value& v)
 {
     // 参数 x_ 为新值插入点, 参数 y_ 为插入点的父节点, 参数 v 为新值
@@ -387,6 +514,17 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
     __rb_tree_rebalance(z, header->parent);     // 参数一为新增节点, 参数二为 root
     ++node_count;
     return iterator(z);
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+void rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::__erase(link_type x)
+{
+    while (x != 0) {
+        __erase(right(x));
+        link_type y = left(x);
+        destory_node(x);
+        x = y;
+    }
 }
 
 // 全局函数
@@ -488,6 +626,146 @@ __rb_tree_rebalance(__rb_tree_node_base* x, __rb_tree_node_base*& root)
     root->color = __rb_tree_black;      // 根节点永远为黑
 }
 
+inline __rb_tree_node_base*
+__rb_tree_rebalance_for_erase(__rb_tree_node_base* __z,
+                              __rb_tree_node_base*& __root,
+                              __rb_tree_node_base*& __leftmost,
+                              __rb_tree_node_base*& __rightmost)
+{
+    __rb_tree_node_base* __y = __z;
+    __rb_tree_node_base* __x = 0;
+    __rb_tree_node_base* __x_parent = 0;
+    if (__y->left == 0) {       // __z has at most one non-null child. y == z.
+        __x = __y->right;       // __x might be null.
+    } else {
+        if (__y->right == 0) {  // __z has exactly one non-null child. y == z.
+            __x = __y->left;    // __x is not null.
+        } else {                // __z has two non-null children.  Set __y to
+            __y = __y->right;   //   __z's successor.  __x might be null.
+            while (__y->left != 0)
+                __y = __y->left;
+            __x = __y->right;
+        }
+    }
+    if (__y != __z) {          // relink y in place of z.  y is z's successor
+        __z->left->parent = __y; 
+        __y->left = __z->left;
+        if (__y != __z->right) {
+            __x_parent = __y->parent;
+            if (__x) __x->parent = __y->parent;
+            __y->parent->left = __x;      // __y must be a child of _M_left
+            __y->right = __z->right;
+            __z->right->parent = __y;
+        } else {
+            __x_parent = __y;
+        }
+        if (__root == __z) {
+            __root = __y;
+        } else if (__z->parent->left == __z) {
+            __z->parent->left = __y;
+        } else { 
+            __z->parent->right = __y;
+        }
+        __y->parent = __z->parent;
+        std::swap(__y->color, __z->color);
+        __y = __z;
+        // __y now points to node to be actually deleted
+    } else {                        // __y == __z
+        __x_parent = __y->parent;
+        if (__x) __x->parent = __y->parent;   
+        if (__root == __z) {
+            __root = __x;
+        } else {
+            if (__z->parent->left == __z) {
+                __z->parent->left = __x;
+            } else {
+                __z->parent->right = __x;
+            }
+        }
+        if (__leftmost == __z) {
+            if (__z->right == 0) {        // __z->_M_left must be null also
+                __leftmost = __z->parent;
+                // makes __leftmost == _M_header if __z == __root
+            } else {
+                __leftmost = __rb_tree_node_base::minimum(__x);
+            }
+        }
+        if (__rightmost == __z) {
+            if (__z->left == 0) {         // __z->_M_right must be null also
+                __rightmost = __z->parent;  
+                // makes __rightmost == _M_header if __z == __root
+            } else {                     // __x == __z->_M_left
+                __rightmost = __rb_tree_node_base::maximum(__x);
+            }
+        }
+    }
+    if (__y->color != __rb_tree_red) { 
+        while (__x != __root && (__x == 0 || __x->color == __rb_tree_black)) {
+            if (__x == __x_parent->left) {
+                __rb_tree_node_base* __w = __x_parent->right;
+                if (__w->color == __rb_tree_red) {
+                    __w->color = __rb_tree_black;
+                    __x_parent->color = __rb_tree_red;
+                    __rb_tree_rotate_left(__x_parent, __root);
+                    __w = __x_parent->right;
+                }
+                if ((__w->left == 0 || 
+                    __w->left->color == __rb_tree_black) &&
+                    (__w->right == 0 || 
+                    __w->right->color == __rb_tree_black))
+                {
+                    __w->color = __rb_tree_red;
+                    __x = __x_parent;
+                    __x_parent = __x_parent->parent;
+                } else {
+                    if (__w->right == 0 || 
+                        __w->right->color == __rb_tree_black)
+                    {
+                        if (__w->left) __w->left->color = __rb_tree_black;
+                        __w->color = __rb_tree_red;
+                        __rb_tree_rotate_right(__w, __root);
+                        __w = __x_parent->right;
+                    }
+                    __w->color = __x_parent->color;
+                    __x_parent->color = __rb_tree_black;
+                    if (__w->right) __w->right->color = __rb_tree_black;
+                    __rb_tree_rotate_left(__x_parent, __root);
+                    break;
+                }
+            } else {                  // same as above, with _M_right <-> _M_left.
+                __rb_tree_node_base* __w = __x_parent->left;
+                if (__w->color == __rb_tree_red) {
+                    __w->color = __rb_tree_black;
+                    __x_parent->color = __rb_tree_red;
+                    __rb_tree_rotate_right(__x_parent, __root);
+                    __w = __x_parent->left;
+                }
+                if ((__w->right == 0 || __w->right->color == __rb_tree_black) &&
+                    (__w->left == 0 || __w->left->color == __rb_tree_black))
+                {
+                    __w->color = __rb_tree_red;
+                    __x = __x_parent;
+                    __x_parent = __x_parent->parent;
+                } else {
+                    if (__w->left == 0 || __w->left->color == __rb_tree_black) {
+                        if (__w->right) __w->right->color = __rb_tree_black;
+                        __w->color = __rb_tree_red;
+                        __rb_tree_rotate_left(__w, __root);
+                        __w = __x_parent->left;
+                    }
+                    __w->color = __x_parent->color;
+                    __x_parent->color = __rb_tree_black;
+                    if (__w->left) __w->left->color = __rb_tree_black;
+                    __rb_tree_rotate_right(__x_parent, __root);
+                    break;
+                }
+            }
+            if (__x) __x->color = __rb_tree_black;
+        }
+    }
+    return __y;
+}
+
 // 寻找 RB 树中是否有键值为 k 的节点
 template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
 typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
@@ -508,4 +786,56 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::find(const Key& k)
     }
     iterator j = iterator(y);
     return (j == end() || key_compare(k, key(j.node))) ? end() : j;
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::size_type
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::count(const Key& k) const
+{
+    std::pair<const_iterator, const_iterator> p = equal_range(k);
+    size_type n = 0;
+    distance(p.first, p.second, n);
+    return n;
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::lower_bound(const Key& k)
+{
+    link_type y = header;   // last node which is not less than k
+    link_type x = root();   // current node
+
+    while (x != 0) {
+        if (!key_compare(Key(x), k)) {
+            y = x, x = left(x);
+        } else {
+            x = right(x);
+        }
+    }
+    return iterator(y);
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::upper_bound(const Key& k)
+{
+    link_type y = header;   // last node which is not less than k
+    link_type x = root();   // current node
+
+    while (x != 0) {
+        if (key_compare(k, Key(x))) {
+            y = x, x = left(x);
+        } else {
+            x = right(x);
+        }
+    }
+    return iterator(y);
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+std::pair<typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator,
+          typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator>
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::equal_range(const Key& k)
+{
+    return std::pair<iterator, iterator>(lower_bound(k), upper_bound(k));
 }
