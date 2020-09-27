@@ -1,8 +1,7 @@
 #ifndef __STL_SET_H
 #define __STL_SET_H
 
-#include <utility>
-
+#include "../src/stl_pair.h"
 #include "../src/stl_function.h"
 #include "../src/stl_alloc.h"
 #include "../src/stl_tree.h"
@@ -77,11 +76,11 @@ public:
     void swap(set<Key, Compare, Alloc>& x) { t.swap(x.t); }
 
     // insert/erase
-    typedef std::pair<iterator, bool> pair_iterator_bool;
-    std::pair<iterator, bool> insert(const value_type& x)
+    typedef pair<iterator, bool> pair_iterator_bool;
+    pair<iterator, bool> insert(const value_type& x)
     {
-        std::pair<typename rep_type::iterator, bool> p = t.insert_unique(x);
-        return std::pair<iterator, bool>(p.first, p.second);
+        pair<typename rep_type::iterator, bool> p = t.insert_unique(x);
+        return pair<iterator, bool>(p.first, p.second);
     }
     iterator insert(iterator position, const value_type& x)
     {
@@ -120,7 +119,7 @@ public:
     {
         return t.upper_bound(x);
     }
-    std::pair<iterator, iterator> equal_range(const key_type& x) const
+    pair<iterator, iterator> equal_range(const key_type& x) const
     {
         return t.equal_range(x);
     }

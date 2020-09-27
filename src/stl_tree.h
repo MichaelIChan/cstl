@@ -1,8 +1,7 @@
 #ifndef __STL_TREE_H
 #define __STL_TREE_H
 
-#include <utility>
-
+#include "../src/stl_pair.h"
 #include "../src/stl_config.h"
 #include "../src/stl_alloc.h"
 #include "../src/stl_iterator.h"
@@ -293,12 +292,12 @@ public:     // set operations
     const_iterator lower_bound(const Key& k) const;
     iterator upper_bound(const Key& k);
     const_iterator upper_bound(const Key& k) const;
-    std::pair<iterator,iterator> equal_range(const Key& k);
-    std::pair<const_iterator, const_iterator> equal_range(const Key& k) const;
+    pair<iterator,iterator> equal_range(const Key& k);
+    pair<const_iterator, const_iterator> equal_range(const Key& k) const;
 
 public:     // insert/erase
     // 将 x 插入到 RB-tree 中 (保持节点值独一无二)
-    std::pair<iterator, bool> insert_unique(const value_type& v);
+    pair<iterator, bool> insert_unique(const value_type& v);
     iterator insert_unique(iterator position, const value_type& v);
     void insert_unique(const_iterator first, const_iterator last);
     // 将 x 插入到 RB-tree 中 (允许节点值重复)
@@ -367,7 +366,7 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_equal(const Value& v)
 // 插入新值: 节点键值不允许重复, 若重复则插入无效
 // 注意, 返回值是个 pair, 第一个元素是个 RB-tree 迭代器, 指向新增节点, 第二元素表示插入成功与否
 template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
-std::pair<typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator, bool>
+pair<typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator, bool>
 rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_unique(const Value& v)
 {
     link_type y = header;
@@ -383,7 +382,7 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_unique(const Value& v)
     iterator j = iterator(y);   // 令迭代器 j 指向插入点的父节点 y
     if (comp) {     // 如果离开 while 循环时 comp 为真(表示遇 "大" , 将插入于左侧)
         if ( j == begin()) {    // 如果插入点的父节点为最左节点
-            return std::pair<iterator, bool>(__insert(x, y, v), true);
+            return pair<iterator, bool>(__insert(x, y, v), true);
             // 以上, x 为插入点， y 为插入点的父节点, v 为新值
         } else {    // 否则(插入点的父节点不为最左节点)
             --j;    // 调整 j
@@ -391,11 +390,11 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_unique(const Value& v)
     }
     if (key_compare(key(j.node), KeyOfValue()(v))) {
         // 新键值不与既有节点的键值重复, 于是以下执行安插操作
-        return std::pair<iterator, bool>(__insert(x, y, v), true);
+        return pair<iterator, bool>(__insert(x, y, v), true);
         // 以上, x 为新值插入点, y 为插入点的父节点, v 为新值
     }
     // 进行至此, 表示新值一定与树中键值重复, 那么就不该插入新值
-    return std::pair<iterator, bool>(j, false);
+    return pair<iterator, bool>(j, false);
 }
 
 template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
@@ -455,7 +454,7 @@ template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
 typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::size_type
 rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::erase(const key_type& k)
 {
-    std::pair<iterator, iterator> p = equal_range(k);
+    pair<iterator, iterator> p = equal_range(k);
     size_type n = 0;
     std::distance(p.first, p.second, n);
     erase(p.first, p.second);
@@ -792,7 +791,7 @@ template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
 typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::size_type
 rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::count(const Key& k) const
 {
-    std::pair<const_iterator, const_iterator> p = equal_range(k);
+    pair<const_iterator, const_iterator> p = equal_range(k);
     size_type n = 0;
     distance(p.first, p.second, n);
     return n;
@@ -833,9 +832,9 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::upper_bound(const Key& k)
 }
 
 template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
-std::pair<typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator,
+pair<typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator,
           typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator>
 rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::equal_range(const Key& k)
 {
-    return std::pair<iterator, iterator>(lower_bound(k), upper_bound(k));
+    return pair<iterator, iterator>(lower_bound(k), upper_bound(k));
 }
