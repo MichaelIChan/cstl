@@ -123,7 +123,41 @@ public:
     void clear() { t.clear(); }
 
     // map operations:
-    // TODO
+    
+    iterator find(const key_type& x) { return t.find(x); }
+    const_iterator find(const key_type& x) const { return t.find(x); }
+    size_type count(const key_type& x) const { return t.count(x); }
+    iterator lower_bound(const key_type& x) { return t.lower_bound(x); }
+    const_iterator lower_bound(const key_type& x) const
+    {
+        return t.lower_bound(x);
+    }
+
+    pair<iterator, iterator> equal_range(const key_type& x)
+    {
+        return t.equal_range(x);
+    }
+
+    pair<const_iterator, const_iterator> equal_range(const key_type& x) const
+    {
+        return t.equal_range(x);
+    }
+    friend bool operator== __STL_NULL_TMPL_ARGS (const map&, const map&);
+    friend bool operator< __STL_NULL_TMPL_ARGS (const map&, const map&);
 };
+
+template <class Key, class T, class Compare, class Alloc>
+inline bool operator==(const map<Key, T, Compare, Alloc>& x,
+                       const map<Key, T, Compare, Alloc>& y)
+{
+    return x.t == y.t;
+}
+
+template <class Key, class T, class Compare, class Alloc>
+inline bool operator<(const map<Key, T, Compare, Alloc>& x,
+                      const map<Key, T, Compare, Alloc>& y)
+{
+    return x.t < y.t;
+}
 
 #endif
