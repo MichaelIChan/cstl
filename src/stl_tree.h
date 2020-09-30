@@ -302,6 +302,8 @@ public:     // insert/erase
     void insert_unique(const_iterator first, const_iterator last);
     // 将 x 插入到 RB-tree 中 (允许节点值重复)
     iterator insert_equal(const value_type& x);
+    iterator insert_equal(iterator position, const value_type& v);
+    void insert_equal(const_iterator first, const_iterator last);
 
     void erase(iterator position);
     size_type erase(const key_type& V);
@@ -361,6 +363,50 @@ rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::insert_equal(const Value& v)
     }
     return __insert(x, y, v);
     // 以上, x 为新增插入点, y 为插入点的父节点, v为新值
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+void rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    insert_equal(const_iterator first, const_iterator last)
+{
+    for ( ; first != last; ++first) {
+        insert_equal(*first);
+    }
+}
+
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc>
+typename rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::iterator
+rb_tree<Key, Value, KeyOfValue, Compare, Alloc>::
+    insert_equal(iterator position, const value_type& v)
+{
+    if (position.node == header->left) {    // begin()
+        if (size() > 0 && !key_compare(Key(position.node), KeyOfValue()(v))) {
+            return __insert(position.node, position.node, v);
+            // first argument just needs to be non-null
+        } else {
+            return insert_equal(v);
+        }
+    } else if (position.node == header) {   // end()
+        if (!key_compare(KeyOfValue()(v), Key(rightmost()))) {
+            return __insert(0, rightmost(0), v);
+        } else {
+            return insert_equal(v);
+        }
+    } else {
+        iterator before = position;
+        --before;
+        if (!key_compare(KeyOfValue()(v), Key(before.node))
+            && !key_compare(Key(position.node), KeyOfValue()(v))) {
+            if (right(before.node) == 0) {
+                return __insert(0, before.node, v);
+            } else {
+                return __insert(position.node, position.node, v);
+            }
+            // first argument just needs to be non-null
+        } else {
+            return insert_equal(v);
+        }
+    }
 }
 
 // 插入新值: 节点键值不允许重复, 若重复则插入无效
