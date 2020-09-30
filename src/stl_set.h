@@ -6,7 +6,7 @@
 #include "../src/stl_alloc.h"
 #include "../src/stl_tree.h"
 
-template <class Key, class Compare = std::less<Key>, class Alloc = alloc>
+template <class Key, class Compare = less<Key>, class Alloc = alloc>
 class set {
 public:     // typedefs
     typedef Key key_type;
