@@ -1,13 +1,11 @@
 #ifndef __STL_MAP_H
 #define __STL_MAP_H
 
-#include <algorithm>
-
 #include "../src/stl_function.h"
 #include "../src/stl_pair.h"
 #include "../src/stl_tree.h"
 
-template <class Key, class T, class Compare = std::less<Key>, class Alloc = alloc>
+template <class Key, class T, class Compare = less<Key>, class Alloc = alloc>
 class map {
 public:
     // typedefs:
