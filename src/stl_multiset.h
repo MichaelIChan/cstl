@@ -23,15 +23,15 @@ private:
         };
     */
    typedef rb_tree<key_type, value_type, identity<value_type>, key_compare, Alloc> rep_type;
-   rep_type t;      //  采用红黑树(RB-tree)来表现 set
+   rep_type t;      //  采用红黑树(RB-tree)来表现 multiset
 public:
     typedef typename rep_type::const_pointer pointer;
     typedef typename rep_type::const_pointer const_pointer;
     typedef typename rep_type::const_reference reference;
     typedef typename rep_type::const_reference const_reference;
     typedef typename rep_type::const_iterator iterator;
-    // 注意上一行, iterator 定义为 RB-tree 的 const_iterator, 这表示 set 的迭代器无法执行写入操作.
-    // 这是因为 set 的元素有一定次序安排, 不允许用户在任意处进行写入
+    // 注意上一行, iterator 定义为 RB-tree 的 const_iterator, 这表示 multiset 的迭代器无法执行写入操作.
+    // 这是因为 multiset 的元素有一定次序安排, 不允许用户在任意处进行写入
     typedef typename rep_type::const_iterator const_iterator;
     typedef typename rep_type::const_reverse_iterator reverse_iterator;
     typedef typename rep_type::const_reverse_iterator const_reverse_iterator;
