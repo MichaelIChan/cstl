@@ -82,6 +82,66 @@ __hashtable_iterator<V, K, HF, ExK, EqK, A>::operator++(int)
     return tmp;
 }
 
+template <class Value, class Key, class HashFcn,
+          class ExtractKey, class EqualKey, class Alloc>
+struct __hashtable_const_iterator {
+  typedef hashtable<Value, Key, HashFcn, ExtractKey, EqualKey, Alloc>
+          hashtable;
+  typedef __hashtable_iterator<Value, Key, HashFcn, 
+                               ExtractKey, EqualKey, Alloc>
+          iterator;
+  typedef __hashtable_const_iterator<Value, Key, HashFcn, 
+                                     ExtractKey, EqualKey, Alloc>
+          const_iterator;
+  typedef __hashtable_node<Value> node;
+
+  typedef forward_iterator_tag iterator_category;
+  typedef Value value_type;
+  typedef ptrdiff_t difference_type;
+  typedef size_t size_type;
+  typedef const Value& reference;
+  typedef const Value* pointer;
+
+  const node* cur;
+  const hashtable* ht;
+
+  __hashtable_const_iterator(const node* n, const hashtable* tab)
+    : cur(n), ht(tab) {}
+  __hashtable_const_iterator() {}
+  __hashtable_const_iterator(const iterator& it) 
+    : cur(it.cur), ht(it.ht) {}
+  reference operator*() const { return cur->val; }
+  pointer operator->() const { return &(operator*()); }
+
+  const_iterator& operator++();
+  const_iterator operator++(int);
+  bool operator==(const const_iterator& it) const { return cur == it.cur; }
+  bool operator!=(const const_iterator& it) const { return cur != it.cur; }
+};
+
+template <class Value, class Key, class HF, class ExK, class EqK, class A>
+__hashtable_const_iterator<Value, Key, HF, ExK, EqK, A>&
+__hashtable_const_iterator<Value, Key, HF, ExK, EqK, A>::operator++()
+{
+  const _Node* old = cur;
+  cur = cur->next;
+  if (!cur) {
+    size_type bucket = ht->bkt_num(old->val);
+    while (!cur && ++bucket < ht->buckets.size())
+      cur = ht->buckets[bucket];
+  }
+  return *this;
+}
+
+template <class Value, class Key, class HF, class ExK, class EqK, class A>
+inline __hashtable_const_iterator<Value, Key, HF, ExK, EqK, A>
+__hashtable_const_iterator<Value, Key, HF, ExK, EqK, A>::operator++(int)
+{
+  const_iterator tmp = *this;
+  ++*this;
+  return tmp;
+}
+
 // hashtable 的模版参数
 // Value: 节点的实值型别
 // Key: 节点的键值型别
@@ -111,12 +171,49 @@ private:
     size_type num_elements;
 
 public:
+  typedef __hashtable_iterator<_Val,_Key,_HashFcn,_ExtractKey,_EqualKey,_Alloc>
+          iterator;
+  typedef __hashtable_const_iterator<_Val,_Key,_HashFcn,_ExtractKey,_EqualKey,
+                                    _Alloc>
+          const_iterator;
+
+public:
     // bucket 个数即 buckets vector 的大小
     size_type bucket_count() const { return buckets.size(); }
 
     // 总共可以有多少 buckets
     size_type max_bucket_count() const
         { return __stl_prime_list[__stl_num_primes - 1]; }
+
+private:
+    node* new_node(const value_type& obj)
+    {
+        node* n = node_allocator::allocate();
+        n->next = 0;
+        __STL_TRY {
+            construct(&n->val, obj);
+            return n;
+        }
+        __STL_UNWIND(node_allocator::deallocate(n));
+    }
+
+    void delete_node(node* n)
+    {
+        destory(&n->val);
+        node_allocator::deallocate(n);
+    }
+
+    void initialize_buckets(size_type n)
+    {
+        const size_type n_buckets = next_size(n);
+        // 举例: 传入 50, 返回 53. 以下首先保留 53 个元素空间, 然后将其全部填 0
+        buckets.reserve(n_buckets);
+        buckets.insert(buckets.end(), n_buckets, (node*)0);
+        num_elements = 0;
+    }
+
+    // 返回最接近 n 并大于或等于 n 的质数
+    size_type next_size(size_type n) const { return __stl_next_prime(n); }
 };
 
 // 注意: 假设 long 至少有 32 bits

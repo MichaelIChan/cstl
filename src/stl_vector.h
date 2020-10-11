@@ -8,12 +8,13 @@ template <class T, class Alloc = alloc>
 class vector {
 public:
     // vector 的嵌套型别定义
-    typedef T           value_type;
-    typedef value_type* pointer;
-    typedef value_type* iterator;       // vector 的迭代器是普通指针
-    typedef value_type& reference;
-    typedef size_t      size_type;
-    typedef ptrdiff_t   difference_type;
+    typedef T                 value_type;
+    typedef value_type*       pointer;
+    typedef value_type*       iterator;       // vector 的迭代器是普通指针
+    typedef const value_type* const_iterator;
+    typedef value_type&       reference;
+    typedef size_t            size_type;
+    typedef ptrdiff_t         difference_type;
 
 protected:
     // 以下, simple_alloc 是 SGI STL 的空间配置器
@@ -109,6 +110,19 @@ public:
         }
     }
 
+    void reserve(size_type n)
+    {
+        if (capacity() < n) {
+            const size_type old_size = size();
+            iterator tmp = allocate_and_copy(n, start, finish);
+            destroy(start, finish);
+            data_allocator::deallocate(start, end_of_storage - start);
+            start = tmp;
+            finish = tmp + old_size;
+            end_of_storage = start + n;
+        }
+    }
+
     void resize(size_type new_size) { resize(new_size, T()); }
     void clear() { erase(begin(), end()); }
 
@@ -119,6 +133,17 @@ protected:
         iterator result = data_allocator::allocate(n);
         uninitialized_fill_n(result, n, x);
         return result;
+    }
+
+    iterator allocate_and_copy(size_type n, const_iterator first,
+                                            const_iterator last)
+    {
+        iterator result = data_allocator::allocate(n);
+        __STL_TRY {
+            uninitialized_copy(first, last, result);
+            return result;
+        }
+        __STL_UNWIND(data_allocator::deallocate(result, n));
     }
 };
 
