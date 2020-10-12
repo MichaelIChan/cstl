@@ -155,9 +155,16 @@ template <class Value, class Key, class HashFcn,
           class ExtractKey, class EqualKey, class Alloc>
 class hashtable {
 public:
-    typedef HashFcn  hasher;        // 为 template 型别参数重新定义一个别称
-    typedef EqualKey key_equal;     // 为 template 型别参数重新定义一个别称
-    typedef size_t   size_type;
+    typedef Key key_type;
+    typedef Value value_type;
+    typedef ptrdiff_t         difference_type;
+    typedef value_type*       pointer;
+    typedef const value_type* const_pointer;
+    typedef value_type&       reference;
+    typedef const value_type& const_reference;
+    typedef HashFcn           hasher;        // 为 template 型别参数重新定义一个别称
+    typedef EqualKey          key_equal;     // 为 template 型别参数重新定义一个别称
+    typedef size_t            size_type;
 
 private:
     // 以下三者都是 function objects.
