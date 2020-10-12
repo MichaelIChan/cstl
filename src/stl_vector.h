@@ -1,6 +1,8 @@
 #ifndef __STL_LIST_H
 #define __STL_LIST_H
 
+#include <utility>
+
 #include "stl_uninitialized.h"
 #include "stl_alloc.h"
 
@@ -121,6 +123,12 @@ public:
             finish = tmp + old_size;
             end_of_storage = start + n;
         }
+    }
+
+    void swap(vector<T, Alloc>& x) {
+        std::swap(start, x.start);
+        std::swap(finish, x.finish);
+        std::swap(end_of_storage, x.end_of_storage);
     }
 
     void resize(size_type new_size) { resize(new_size, T()); }
