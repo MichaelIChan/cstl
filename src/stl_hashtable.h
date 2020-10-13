@@ -3,7 +3,6 @@
 
 #include <algorithm>
 
-#include "../src/stl_hash_fun.h"
 #include "../src/stl_iterator.h"
 #include "../src/stl_alloc.h"
 #include "../src/stl_vector.h"
@@ -192,6 +191,7 @@ public:
     {
         initialize_buckets(n);
     }
+    ~hashtable() { clear(); }
 
 public:
     // bucket 个数即 buckets vector 的大小
@@ -203,6 +203,9 @@ public:
 
     // 在不需重建表格的情况下插入新节点. 键值不允许重复
     pair<iterator, bool> insert_unique_noresize(const value_type& obj);
+
+    // 在不需重建表格的情况下插入新节点. 键值允许重复
+    iterator insert_equal_noresize(const value_type& obj);
     
     // 插入元素, 不允许重复
     pair<iterator, bool> insert_unique(const value_type& obj)
@@ -211,8 +214,17 @@ public:
         return insert_unique_noresize(obj);
     }
 
+    // 插入元素, 允许重复
+    iterator insert_equal(const value_type& obj)
+    {
+        resize(num_elements + 1);   // 判断是否需要重建表格, 如需要就扩充
+        return insert_equal_noresize(obj);
+    }
+
     // 判断是否需要重建表格. 如果不需要, 立即返回. 如果需要, 则进一步处理
     void resize(size_type num_elements_hint);
+
+    void clear();
 
 private:
     size_type bkt_num_key(const key_type& key) const
@@ -263,6 +275,8 @@ private:
 
     // 返回最接近 n 并大于或等于 n 的质数
     size_type next_size(size_type n) const { return __stl_next_prime(n); }
+
+    void copy_from(const hashtable& ht);
 };
 
 // 注意: 假设 long 至少有 32 bits
@@ -344,6 +358,82 @@ hashtable<V, K, HF, Ex, Eq, A>::insert_unique_noresize(const value_type& obj)
     buckets[n] = tmp;               // 令新节点成为链表的第一个节点
     ++num_elements;                 // 节点个数累加 1
     return pair<iterator, bool>(iterator(tmp, this), true);
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+typename hashtable<V, K, HF, Ex, Eq, A>::iterator
+hashtable<V, K, HF, Ex, Eq, A>::insert_equal_noresize(const value_type& obj)
+{
+    const size_type n = bkt_num(obj);   // 决定 obj 应位于 #n bucket
+    node* first = buckets[n];           // 令 first 指向 bucket 对应的串行头部
+
+    // 如果 buckets[n] 已被占用, 此时 first 将不为 0, 于是进入以下循环,
+    // 走过 bucket 所对应的整个链表
+    for (node* cur = first; cur; cur = cur->next) {
+        if (equals(get_key(cur->val), get_key(obj))) {
+            // 如果发现与链表中的某键值相同, 就马上插入, 然后返回
+            node* tmp = new_node(obj);      // 产生新节点
+            tmp->next = cur->next;          // 将新节点插入于目前位置之后
+            cur->next = tmp;
+            ++num_elements;                 // 节点个数累加 1
+            return iterator(tmp, this);     // 返回一个迭代器, 指向新增节点
+        }
+    }
+
+    // 进行至此, 表示没有发现重复的键值
+    node* tmp = new_node(obj);      // 产生新节点
+    tmp->next = first;              // 将新节点插入于链头部
+    buckets[n] = tmp;
+    ++num_elements;                 // 节点个数累加 1
+    return iterator(tmp, this);     // 返回一个迭代器, 指向新增节点
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+void hashtable<V, K, HF, Ex, Eq, A>::clear()
+{
+    // 针对每一个 bucket
+    for (size_type i = 0; i < buckets.size(); ++i) {
+        node* cur = buckets[i];
+        // 将 bucket list 中的每一个节点删除掉
+        while (cur != 0) {
+            node* next = cur->next;
+            delete_node(cur);
+            cur = next;
+        }
+        buckets[i] = 0;     // 令 bucket 内容为 null 指针
+    }
+    num_elements = 0;       // 令总节点个数为 0
+
+    // 注意, buckets vector 并未释放掉空间, 仍保有原来大小
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+void hashtable<V, K, HF, Ex, Eq, A>::copy_from(const hashtable& ht)
+{
+    // 先清除己方的 buckets vector 保留空间, 使与对方相同
+    // 如果己方空间大于对方, 就不动, 如果己方空间小于对方, 就会增大
+    buckets.reserve(ht.buckets.size());
+    // 从己方的 buckets vector 尾端开始, 插入 n 个元素, 其值为 null 指针
+    // 注意, 此时 buckets vector 为空, 所以所谓尾端, 就是起头处
+    buckets.insert(buckets.end(), ht.buckets.size(), (node*)0);
+    __STL_TRY {
+        // 针对 buckets vector
+        for (size_type i = 0; i < ht.buckets.size()l ++i) {
+            // 复制 vector 的每一个元素(是个指针, 指向 hashtable node)
+            if (const node* cur = ht.buckets[i]) {
+                node* copy = new_node(cur->val);
+                buckets[i] = copy;
+
+                // 针对同一个 bucket list, 复制每一个节点
+                for (node* next = cur->next; next; cur = next, next = cur->next) {
+                    copy->next = new_node(next->val);
+                    copy = copy->next;
+                }
+            }
+        }
+        num_elements = ht.num_elements;     // 重新记录节点个数(hashtable 的大小)
+    }
+    __STL_UNWIND(clear());
 }
 
 #endif
