@@ -179,9 +179,9 @@ private:
     size_type num_elements;
 
 public:
-  typedef __hashtable_iterator<Val, Key, HashFcn, ExtractKey, EqualKey, Alloc>
+  typedef __hashtable_iterator<Value, Key, HashFcn, ExtractKey, EqualKey, Alloc>
           iterator;
-  typedef __hashtable_const_iterator<Val, Key, HashFcn, ExtractKey, EqualKey,
+  typedef __hashtable_const_iterator<Value, Key, HashFcn, ExtractKey, EqualKey,
                                      Alloc>
           const_iterator;
 
@@ -193,6 +193,43 @@ public:
     }
     ~hashtable() { clear(); }
 
+    size_type size() const { return num_elements; }
+    size_type max_size() const { return size_type(-1); }
+    bool empty() const { return size() == 0; }
+
+    void swap(hashtable& ht)
+    {
+        std::swap(hash, ht.hash);
+        std::swap(equals, ht.equals);
+        std::swap(get_key, ht.get_key);
+        buckets.swap(ht.buckets);
+        std::swap(num_elements, ht.num_elements);
+    }
+
+    iterator begin()
+    { 
+        for (size_type n = 0; n < buckets.size(); ++n) {
+            if (buckets[n]) {
+                return iterator(buckets[n], this);
+            }
+        }
+        return end();
+    }
+
+    iterator end() { return iterator(0, this); }
+
+    const_iterator begin() const
+    {
+        for (size_type n = 0; n < buckets.size(); ++n) {
+            if (buckets[n]) {
+                return const_iterator(buckets[n], this);
+            }
+        }
+        return end();
+    }
+
+    const_iterator end() const { return const_iterator(0, this); }
+
 public:
     // bucket 个数即 buckets vector 的大小
     size_type bucket_count() const { return buckets.size(); }
@@ -200,6 +237,15 @@ public:
     // 总共可以有多少 buckets
     size_type max_bucket_count() const
         { return __stl_prime_list[__stl_num_primes - 1]; }
+
+    size_type elems_in_bucket(size_type bucket) const
+    {
+        size_type result = 0;
+        for (node* cur = buckets[bucket]; cur; cur = cur->next) {
+            result += 1;
+        }
+        return result;
+    }
 
     // 在不需重建表格的情况下插入新节点. 键值不允许重复
     pair<iterator, bool> insert_unique_noresize(const value_type& obj);
