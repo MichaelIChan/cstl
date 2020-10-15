@@ -224,6 +224,41 @@ public:
     // 判断是否需要重建表格. 如果不需要, 立即返回. 如果需要, 则进一步处理
     void resize(size_type num_elements_hint);
 
+    iterator find(const key_type& key) 
+    {
+        size_type n = bkt_num_key(key);
+        node* first;
+        for ( first = buckets[n];
+            first && !equals(get_key(first->val), key);
+            first = first->next)
+        {}
+        return iterator(first, this);
+    } 
+
+    const_iterator find(const key_type& key) const
+    {
+        size_type n = bkt_num_key(key);
+        const node* first;
+        for ( first = buckets[n];
+            first && !equals(get_key(first->val), key);
+            first = first->next)
+        {}
+        return const_iterator(first, this);
+    } 
+
+    size_type count(const key_type& key) const
+    {
+        const size_type n = bkt_num_key(key);
+        size_type result = 0;
+
+        for (const node* cur = buckets[n]; cur; cur = cur->next) {
+            if (equals(get_key(cur->val), key)) {
+                ++result;
+            }
+        }
+        return result;
+    }
+
     void clear();
 
 private:
