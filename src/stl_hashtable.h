@@ -22,7 +22,7 @@ template <class Value, class Key, class HashFcn,
           class ExtractKey, class EqualKey, class Alloc>
 struct __hashtable_iterator;
 
-template <class Value, class _Key, class _HashFcn,
+template <class Value, class Key, class HashFcn,
           class ExtractKey, class EqualKey, class Alloc>
 struct __hashtable_const_iterator;
 
@@ -124,7 +124,7 @@ template <class Value, class Key, class HF, class ExK, class EqK, class A>
 __hashtable_const_iterator<Value, Key, HF, ExK, EqK, A>&
 __hashtable_const_iterator<Value, Key, HF, ExK, EqK, A>::operator++()
 {
-  const _Node* old = cur;
+  const node* old = cur;
   cur = cur->next;
   if (!cur) {
     size_type bucket = ht->bkt_num(old->val);
@@ -164,6 +164,9 @@ public:
     typedef HashFcn           hasher;        // 为 template 型别参数重新定义一个别称
     typedef EqualKey          key_equal;     // 为 template 型别参数重新定义一个别称
     typedef size_t            size_type;
+
+    hasher hash_funct() const { return hash; }
+    key_equal key_eq() const { return equals; }
 
 private:
     // 以下三者都是 function objects.
@@ -305,6 +308,15 @@ public:
         return result;
     }
 
+    pair<iterator, iterator> equal_range(const key_type& key);
+    pair<const_iterator, const_iterator> equal_range(const key_type& key) const;
+
+    size_type erase(const key_type& key);
+    void erase(const iterator& it);
+    void erase(iterator first, iterator last);
+    void erase(const const_iterator& it);
+    void erase(const_iterator first, const_iterator last);
+
     void clear();
 
 private:
@@ -356,6 +368,9 @@ private:
 
     // 返回最接近 n 并大于或等于 n 的质数
     size_type next_size(size_type n) const { return __stl_next_prime(n); }
+
+    void erase_bucket(const size_type n, node* first, node* last);
+    void erase_bucket(const size_type n, node* last);
 
     void copy_from(const hashtable& ht);
 };
@@ -467,6 +482,188 @@ hashtable<V, K, HF, Ex, Eq, A>::insert_equal_noresize(const value_type& obj)
     buckets[n] = tmp;
     ++num_elements;                 // 节点个数累加 1
     return iterator(tmp, this);     // 返回一个迭代器, 指向新增节点
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+pair<typename hashtable<V, K, HF, Ex, Eq, A>::iterator,
+     typename hashtable<V, K, HF, Ex, Eq, A>::iterator>
+hashtable<V, K, HF, Ex, Eq, A>::equal_range(const key_type& key)
+{
+    typedef pair<iterator, iterator> Pii;
+    const size_type n = bkt_num_key(key);
+
+    for (node* first = buckets[n]; first; first = first->next) {
+        if (equals(get_key(first->val), key)) {
+            for (node* cur = first->next; cur; cur = cur->next) {
+                if (!equals(get_key(cur->val), key)) {
+                    return Pii(iterator(first, this), iterator(cur, this));
+                }
+            }
+            for (size_type m = n + 1; m < buckets.size(); ++m) {
+                if (buckets[m]) {
+                    return Pii(iterator(first, this), iterator(buckets[m], this));
+                }
+            }
+            return Pii(iterator(first, this), end());
+        }
+    }
+    return Pii(end(), end());
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+pair<typename hashtable<V, K, HF, Ex, Eq, A>::const_iterator,
+     typename hashtable<V, K, HF, Ex, Eq, A>::const_iterator>
+hashtable<V, K, HF, Ex, Eq, A>::equal_range(const key_type& key) const
+{
+    typedef pair<const_iterator, const_iterator> Pii;
+    const size_type n = bkt_num_key(key);
+
+    for (const node* first = buckets[n]; first; first = first->next) {
+        if (equals(get_key(first->val), key)) {
+            for (const node* cur = first->next; cur; cur = cur->next) {
+                if (!equals(get_key(cur->val), key)) {
+                    return Pii(const_iterator(first, this), const_iterator(cur, this));
+                }
+            }
+            for (size_type m = n + 1; m < buckets.size(); ++m) {
+                if (buckets[m]) {
+                    return Pii(const_iterator(first, this), const_iterator(buckets[m], this));
+                }
+            }
+            return Pii(const_iterator(first, this), end());
+        }
+    }
+    return Pii(end(), end());
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+typename hashtable<V, K, HF, Ex, Eq, A>::size_type 
+hashtable<V, K, HF, Ex, Eq, A>::erase(const key_type& key)
+{
+    const size_type n = bkt_num_key(key);
+    node* first = buckets[n];
+    size_type erased = 0;
+
+    if (first) {
+        node* cur = first;
+        node* next = cur->next;
+        while (next) {
+            if (equals(get_key(next->val), key)) {
+                cur->next = next->next;
+                delete_node(next);
+                next = cur->next;
+                ++erased;
+                --num_elements;
+            } else {
+                cur = next;
+                next = cur->next;
+            }
+        }
+        if (equals(get_key(first->val), key)) {
+            buckets[n] = first->next;
+            delete_node(first);
+            ++erased;
+            --num_elements;
+        }
+    }
+    return erased;
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+void hashtable<V, K, HF, Ex, Eq, A>::erase(const iterator& it)
+{
+    node* p = it.cur;
+    if (p) {
+        const size_type n = bkt_num(p->val);
+        node* cur = buckets[n];
+
+        if (cur == p) {
+            buckets[n] = cur->next;
+            delete_node(cur);
+            --num_elements;
+        } else {
+            node* next = cur->next;
+            while (next) {
+                if (next == p) {
+                    cur->next = next->next;
+                    delete_node(next);
+                    --num_elements;
+                    break;
+                } else {
+                    cur = next;
+                    next = cur->next;
+                }
+            }
+        }
+    }
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+void hashtable<V, K, HF, Ex, Eq, A>::erase(iterator first, iterator last)
+{
+    size_type f_bucket = first.cur ? bkt_num(first.cur->val) : buckets.size();
+    size_type l_bucket = last.cur ? bkt_num(last.cur->val) : buckets.size();
+
+    if (first.cur == last.cur) {
+        return;
+    } else if (f_bucket == l_bucket) {
+        erase_bucket(f_bucket, first.cur, last.cur);
+    } else {
+        erase_bucket(f_bucket, first.cur, 0);
+        for (size_type n = f_bucket + 1; n < l_bucket; ++n) {
+            erase_bucket(n, 0);
+        }
+        if (l_bucket != buckets.size()) {
+            erase_bucket(l_bucket, last.cur);
+        }
+    }
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+inline void
+hashtable<V, K, HF, Ex, Eq, A>::erase(const_iterator first, const_iterator last)
+{
+    erase(iterator(const_cast<node*>(first.cur), const_cast<hashtable*>(first.ht)),
+          iterator(const_cast<node*>(last.cur), const_cast<hashtable*>(last.ht)));
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+inline void
+hashtable<V, K, HF, Ex, Eq, A>::erase(const const_iterator& it)
+{
+    erase(iterator(const_cast<node*>(it.cur), const_cast<hashtable*>(it.ht)));
+}
+
+template <class V, class K, class _HF, class _Ex, class _Eq, class _All>
+void hashtable<V, K,_HF,_Ex,_Eq,_All>
+    ::erase_bucket(const size_type n, node* first, node* last)
+{
+    node* cur = buckets[n];
+    if (cur == first) {
+        erase_bucket(n, last);
+    } else {
+        node* next;
+        for (next = cur->next; next != first; cur = next, next = cur->next);
+        while (next != last) {
+            cur->next = next->next;
+            delete_node(next);
+            next = cur->next;
+            --num_elements;
+        }
+    }
+}
+
+template <class V, class K, class _HF, class _Ex, class _Eq, class _All>
+void hashtable<V, K,_HF,_Ex,_Eq,_All> ::erase_bucket(const size_type n, node* last)
+{
+    node* cur = buckets[n];
+    while (cur != last) {
+        node* next = cur->next;
+        delete_node(cur);
+        cur = next;
+        buckets[n] = cur;
+        --num_elements;
+    }
 }
 
 template <class V, class K, class HF, class Ex, class Eq, class A>
