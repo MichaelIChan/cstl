@@ -263,6 +263,12 @@ public:
         return insert_unique_noresize(obj);
     }
 
+    template <class InputIterator>
+    void insert_unique(InputIterator f, InputIterator l)
+    {
+        insert_unique(f, l, iterator_category(f));
+    }
+
     // 插入元素, 允许重复
     iterator insert_equal(const value_type& obj)
     {
