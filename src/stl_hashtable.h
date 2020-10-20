@@ -279,6 +279,8 @@ public:
     // 判断是否需要重建表格. 如果不需要, 立即返回. 如果需要, 则进一步处理
     void resize(size_type num_elements_hint);
 
+    reference find_or_insert(const value_type& obj);
+
     iterator find(const key_type& key) 
     {
         size_type n = bkt_num_key(key);
@@ -488,6 +490,29 @@ hashtable<V, K, HF, Ex, Eq, A>::insert_equal_noresize(const value_type& obj)
     buckets[n] = tmp;
     ++num_elements;                 // 节点个数累加 1
     return iterator(tmp, this);     // 返回一个迭代器, 指向新增节点
+}
+
+template <class V, class K, class HF, class Ex, class Eq, class A>
+typename hashtable<V, K, HF, Ex, Eq, A>::reference 
+hashtable<V, K, HF, Ex, Eq, A>::find_or_insert(const value_type& obj)
+{
+    resize(num_elements + 1);
+
+    size_type n = bkt_num(obj);
+    node* first = buckets[n];
+
+    for (node* cur = first; cur; cur = cur->next) {
+        if (equals(get_key(cur->val), get_key(obj))) {
+            return cur->val;
+        }
+    }
+
+    node* tmp = new_node(obj);
+    tmp->next = first;
+    buckets[n] = tmp;
+    ++num_elements;
+
+    return tmp->val;
 }
 
 template <class V, class K, class HF, class Ex, class Eq, class A>
