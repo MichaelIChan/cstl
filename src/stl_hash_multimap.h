@@ -111,7 +111,7 @@ public:
 template <class Key, class T, class HF, class EqKey, class Alloc>
 inline bool
 operator==(const hash_multimap<Key, T, HF, EqKey, Alloc>& hm1,
-                    const hash_multimap<Key, T, HF, EqKey, Alloc>& hm2)
+           const hash_multimap<Key, T, HF, EqKey, Alloc>& hm2)
 {
     return hm1.rep == hm2.rep;
 }
