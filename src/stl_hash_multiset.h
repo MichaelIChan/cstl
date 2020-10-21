@@ -99,8 +99,8 @@ public:
 
 template <class Value, class HashFcn, class EqualKey, class Alloc>
 inline bool
-operator==(const hash_multiset<class Value, class HashFcn, class EqualKey, class Alloc>& hs1,
-           const hash_multiset<class Value, class HashFcn, class EqualKey, class Alloc>& hs2)
+operator==(const hash_multiset<Value, HashFcn, EqualKey, Alloc>& hs1,
+           const hash_multiset<Value, HashFcn, EqualKey, Alloc>& hs2)
 {
     return hs1.rep == hs2.rep;
 }
