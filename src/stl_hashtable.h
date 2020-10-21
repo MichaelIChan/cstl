@@ -276,6 +276,20 @@ public:
         return insert_equal_noresize(obj);
     }
 
+    template <class InputIterator>
+    void insert_equal(InputIterator f, InputIterator l)
+    {
+        insert_equal(f, l, iterator_category(f));
+    }
+
+    template <class InputIterator>
+    void insert_equal(InputIterator f, InputIterator l, input_iterator_tag)
+    {
+        for ( ; f != l; ++f) {
+            insert_equal(*f);
+        }
+    }
+
     // 判断是否需要重建表格. 如果不需要, 立即返回. 如果需要, 则进一步处理
     void resize(size_type num_elements_hint);
 
