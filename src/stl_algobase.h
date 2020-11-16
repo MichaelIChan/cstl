@@ -186,27 +186,6 @@ inline void swap(T& a, T& b)
 
 // copy
 
-// 完全泛化版本
-template <class InputIterator, class OutputIterator>
-inline OutputIterator copy(InputIterator first, InputIterator last, OutputIterator result)
-{
-    return __copy_dispatch<InputIterator, OutputIterator>()(first, last, result);
-}
-
-// 以下两个函数，针对原生指针 const char* 和 const wchar_t*, 进行内存直接拷贝操作
-
-inline char* copy(const char* first, const char* last, char* result)
-{
-    std::memmove(result, first, last - first);
-    return result + (last - first);
-}
-
-inline wchar_t* copy(const wchar_t* first, const wchar_t* last, wchar_t* result)
-{
-    std::memmove(result, first, sizeof(wchar_t) * (last - first));
-    return result + (last - first);
-}
-
 // __copy_dispatch()有一个完全泛化版本和两个偏特化版本
 
 // 完全泛化版本
@@ -283,6 +262,27 @@ inline T* __copy_t(const T* first, const T* last, T* result, __false_type)
 {
     // 原生指针毕竟是一种 RandomAccessIterator, 所以交给 __copy_d() 完成
     return __copy_d(first, last, result, (ptrdiff_t*) 0);
+}
+
+// 完全泛化版本
+template <class InputIterator, class OutputIterator>
+inline OutputIterator copy(InputIterator first, InputIterator last, OutputIterator result)
+{
+    return __copy_dispatch<InputIterator, OutputIterator>()(first, last, result);
+}
+
+// 以下两个函数，针对原生指针 const char* 和 const wchar_t*, 进行内存直接拷贝操作
+
+inline char* copy(const char* first, const char* last, char* result)
+{
+    std::memmove(result, first, last - first);
+    return result + (last - first);
+}
+
+inline wchar_t* copy(const wchar_t* first, const wchar_t* last, wchar_t* result)
+{
+    std::memmove(result, first, sizeof(wchar_t) * (last - first));
+    return result + (last - first);
 }
 
 //--------------------------------------------------
