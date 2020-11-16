@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "../src/stl_iterator.h"
+#include "../src/type_traits.h"
 #include "../src/stl_pair.h"
 
 namespace cstl
@@ -181,6 +182,107 @@ inline void swap(T& a, T& b)
     T tmp = a;
     a = b;
     b = tmp;
+}
+
+// copy
+
+// 完全泛化版本
+template <class InputIterator, class OutputIterator>
+inline OutputIterator copy(InputIterator first, InputIterator last, OutputIterator result)
+{
+    return __copy_dispatch<InputIterator, OutputIterator>()(first, last, result);
+}
+
+// 以下两个函数，针对原生指针 const char* 和 const wchar_t*, 进行内存直接拷贝操作
+
+inline char* copy(const char* first, const char* last, char* result)
+{
+    std::memmove(result, first, last - first);
+    return result + (last - first);
+}
+
+inline wchar_t* copy(const wchar_t* first, const wchar_t* last, wchar_t* result)
+{
+    std::memmove(result, first, sizeof(wchar_t) * (last - first));
+    return result + (last - first);
+}
+
+// __copy_dispatch()有一个完全泛化版本和两个偏特化版本
+
+// 完全泛化版本
+template <class InputIterator, class OutputIterator>
+struct __copy_dispatch {
+    OutputIterator operator() (InputIterator first, InputIterator last, OutputIterator result)
+    {
+        return __copy(first, last, result, iterator_category(first));
+    }
+};
+
+// 偏特化版本 (1), 两个参数都是 T* 指针形式
+template <class T>
+struct __copy_dispatch<T*, T*> {
+    T* operator() (T* first, T* last, T* result)
+    {
+        typedef typename __type_traits<T>::has_trivial_assignment_operator t;
+        return __copy_t(first, last, result, t());
+    }
+};
+
+// 偏特化版本 (2), 第一个参数为 const T* 指针形式, 第二个参数为 T* 指针形式
+template <class T>
+struct __copy_dispatch<const T*, T*> {
+    T* operator() (const T* first, const T* last, T* result)
+    {
+        typedef typename __type_traits<T>::has_trivial_assignment_operator t;
+        return __copy_t(first, last, result, t());
+    }
+};
+
+// __copy_dispatch() 的完全泛化版本根据迭代器种类的不同, 调用不同的 __copy()
+
+// InputIterator 版本
+template <class InputIterator, class OutputIterator>
+inline OutputIterator __copy(InputIterator first, InputIterator last,
+                             OutputIterator result, input_iterator_tag)
+{
+    for ( ; first != last; ++result, ++first) {
+        *result = *first;
+    }
+    return result;
+}
+
+// RandomAccessIterator 版本
+template <class RandomAccessIterator, class OutputIterator>
+inline OutputIterator __copy(RandomAccessIterator first, RandomAccessIterator last,
+                             OutputIterator result, random_access_iterator_tag)
+{
+    return __copy_d(first, last, result, distance_type(first));
+}
+
+template <class RandomAccessIterator, class OutputIterator, class Distance>
+inline OutputIterator __copy_d(RandomAccessIterator first, RandomAccessIterator last,
+                               OutputIterator result, Distance*)
+{
+    for (Distance n = last - first; n > 0; --n, ++result, ++first) {
+        *result = *first;   // assignment operator
+    }
+    return result;
+}
+
+// 以下版本适用于 "指针所指的对象具备 trivial assignment operator"
+template <class T>
+inline T* __copy_t(const T* first, const T* last, T* result, __true_type)
+{
+    std::memmove(result, first, sizeof(T) * (last - first));
+    return result + (last - first);
+}
+
+// 以下版本适用于 "指针所指的对象具备 non-trivial assignment operator"
+template <class T>
+inline T* __copy_t(const T* first, const T* last, T* result, __false_type)
+{
+    // 原生指针毕竟是一种 RandomAccessIterator, 所以交给 __copy_d() 完成
+    return __copy_d(first, last, result, (ptrdiff_t*) 0);
 }
 
 };  // namespace cstl
