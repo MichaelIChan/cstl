@@ -180,4 +180,134 @@ public:
     }
 };
 
+template <class _Iterator>
+class reverse_iterator 
+{
+protected:
+  _Iterator current;
+public:
+  typedef typename iterator_traits<_Iterator>::iterator_category
+          iterator_category;
+  typedef typename iterator_traits<_Iterator>::value_type
+          value_type;
+  typedef typename iterator_traits<_Iterator>::difference_type
+          difference_type;
+  typedef typename iterator_traits<_Iterator>::pointer
+          pointer;
+  typedef typename iterator_traits<_Iterator>::reference
+          reference;
+
+  typedef _Iterator iterator_type;
+  typedef reverse_iterator<_Iterator> _Self;
+
+public:
+  reverse_iterator() {}
+  explicit reverse_iterator(iterator_type __x) : current(__x) {}
+
+  reverse_iterator(const _Self& __x) : current(__x.current) {}
+#ifdef __STL_MEMBER_TEMPLATES
+  template <class _Iter>
+  reverse_iterator(const reverse_iterator<_Iter>& __x)
+    : current(__x.base()) {}
+#endif /* __STL_MEMBER_TEMPLATES */
+    
+  iterator_type base() const { return current; }
+  reference operator*() const {
+    _Iterator __tmp = current;
+    return *--__tmp;
+  }
+#ifndef __SGI_STL_NO_ARROW_OPERATOR
+  pointer operator->() const { return &(operator*()); }
+#endif /* __SGI_STL_NO_ARROW_OPERATOR */
+
+  _Self& operator++() {
+    --current;
+    return *this;
+  }
+  _Self operator++(int) {
+    _Self __tmp = *this;
+    --current;
+    return __tmp;
+  }
+  _Self& operator--() {
+    ++current;
+    return *this;
+  }
+  _Self operator--(int) {
+    _Self __tmp = *this;
+    ++current;
+    return __tmp;
+  }
+
+  _Self operator+(difference_type __n) const {
+    return _Self(current - __n);
+  }
+  _Self& operator+=(difference_type __n) {
+    current -= __n;
+    return *this;
+  }
+  _Self operator-(difference_type __n) const {
+    return _Self(current + __n);
+  }
+  _Self& operator-=(difference_type __n) {
+    current += __n;
+    return *this;
+  }
+  reference operator[](difference_type __n) const { return *(*this + __n); }  
+}; 
+ 
+template <class _Iterator>
+inline bool operator==(const reverse_iterator<_Iterator>& __x, 
+                       const reverse_iterator<_Iterator>& __y) {
+  return __x.base() == __y.base();
+}
+
+template <class _Iterator>
+inline bool operator<(const reverse_iterator<_Iterator>& __x, 
+                      const reverse_iterator<_Iterator>& __y) {
+  return __y.base() < __x.base();
+}
+
+#ifdef __STL_FUNCTION_TMPL_PARTIAL_ORDER
+
+template <class _Iterator>
+inline bool operator!=(const reverse_iterator<_Iterator>& __x, 
+                       const reverse_iterator<_Iterator>& __y) {
+  return !(__x == __y);
+}
+
+template <class _Iterator>
+inline bool operator>(const reverse_iterator<_Iterator>& __x, 
+                      const reverse_iterator<_Iterator>& __y) {
+  return __y < __x;
+}
+
+template <class _Iterator>
+inline bool operator<=(const reverse_iterator<_Iterator>& __x, 
+                       const reverse_iterator<_Iterator>& __y) {
+  return !(__y < __x);
+}
+
+template <class _Iterator>
+inline bool operator>=(const reverse_iterator<_Iterator>& __x, 
+                      const reverse_iterator<_Iterator>& __y) {
+  return !(__x < __y);
+}
+
+#endif /* __STL_FUNCTION_TMPL_PARTIAL_ORDER */
+
+template <class _Iterator>
+inline typename reverse_iterator<_Iterator>::difference_type
+operator-(const reverse_iterator<_Iterator>& __x, 
+          const reverse_iterator<_Iterator>& __y) {
+  return __y.base() - __x.base();
+}
+
+template <class _Iterator>
+inline reverse_iterator<_Iterator> 
+operator+(typename reverse_iterator<_Iterator>::difference_type __n,
+          const reverse_iterator<_Iterator>& __x) {
+  return reverse_iterator<_Iterator>(__x.base() - __n);
+}
+
 #endif
