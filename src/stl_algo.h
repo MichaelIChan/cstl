@@ -1,7 +1,10 @@
 #ifndef __STL_ALGO_H
 #define __STL_ALGO_H
 
+#include <stdlib.h>
+
 #include "stl_algobase.h"
+#include "stl_heap.h"
 
 namespace cstl
 {
@@ -1437,6 +1440,279 @@ bool binary_search(ForwardIterator first, ForwardIterator last,
 {
     ForwardIterator i = lower_bound(first, last, value, comp);
     return i != last && !comp(value, *i);
+}
+
+// next_permutation() 会取得 [first, last) 所标示的序列的下一个排列组合
+// 版本一
+template <class BidirectionalIterator>
+bool next_permutation(BidirectionalIterator first, BidirectionalIterator last)
+{
+    if (first == last) return false;    // 空区间
+    BidirectionalIterator i = first;
+    ++i;
+    if (i == last) return false;        // 只有一个元素
+    i = last;
+    --i;
+
+    for (;;) {
+        BidirectionalIterator ii = i;
+        --i;
+        // 以上, 锁定一组(两个)相邻元素
+        if (*i < *ii) {     // 前一个元素小于后一个元素
+            BidirectionalIterator j = last;
+            while (!(*i < *--j));   // 由尾端往前找, 直到遇上比 *i 大的元素
+            iter_swap(i, j);
+            reverse(ii, last);      // 将 ii 之后的元素全部逆向重排
+            return true;
+        }
+        if (i == first) {           // 进行至最前面了
+            reverse(first, last);   // 全部逆向重排
+            return false;
+        }
+    }
+}
+
+// 版本二
+template <class BidirectionalIterator, class Compare>
+bool next_permutation(BidirectionalIterator first, BidirectionalIterator last,
+                      Compare comp)
+{
+    if (first == last) return false;    // 空区间
+    BidirectionalIterator i = first;
+    ++i;
+    if (i == last) return false;        // 只有一个元素
+    i = last;
+    --i;
+
+    for (;;) {
+        BidirectionalIterator ii = i;
+        --i;
+        // 以上, 锁定一组(两个)相邻元素
+        if (comp(*i, *ii)) {            // 前一个元素小于后一个元素
+            BidirectionalIterator j = last;
+            while (!comp(*i, *--j));    // 由尾端往前找, 直到遇上比 *i 大的元素
+            iter_swap(i, j);
+            reverse(ii, last);          // 将 ii 之后的元素全部逆向重排
+            return true;
+        }
+        if (i == first) {               // 进行至最前面了
+            reverse(first, last);       // 全部逆向重排
+            return false;
+        }
+    }
+}
+
+// prev_permutation() 版本一
+template <class BidirectionalIterator>
+bool prev_permutation(BidirectionalIterator first, BidirectionalIterator last)
+{
+    if (first == last) return false;
+    BidirectionalIterator i = first;
+    ++i;
+    if (i == last) return false;
+    i = last;
+    --i;
+
+    for (;;) {
+        BidirectionalIterator ii = i;
+        --i;
+        // 以上, 锁定一组(两个)相邻元素
+        if (*ii < *i) {
+            BidirectionalIterator j = last;
+            while (!(*--j < *i));   // 由尾端往前找, 直到遇上比 *i 小的元素
+            iter_swap(i, j);
+            reverse(ii, last);      // 将 ii 之后的元素全部逆向重排
+            return true;
+        }
+        if (i == first) {           // 进行至最前面了
+            reverse(first, last);   // 全部逆向重排
+            return false;
+        }
+    }
+}
+
+// prev_permutation() 版本二
+template <class BidirectionalIterator, class Compare>
+bool prev_permutation(BidirectionalIterator first, BidirectionalIterator last,
+                      Compare comp)
+{
+    if (first == last) return false;
+    BidirectionalIterator i = first;
+    ++i;
+    if (i == last) return false;
+    i = last;
+    --i;
+
+    for (;;) {
+        BidirectionalIterator ii = i;
+        --i;
+        // 以上, 锁定一组(两个)相邻元素
+        if (comp(*ii, *i)) {
+            BidirectionalIterator j = last;
+            while (!comp(*--j, *i));    // 由尾端往前找, 直到遇上比 *i 小的元素
+            iter_swap(i, j);
+            reverse(ii, last);          // 将 ii 之后的元素全部逆向重排
+            return true;
+        }
+        if (i == first) {               // 进行至最前面了
+            reverse(first, last);       // 全部逆向重排
+            return false;
+        }
+    }
+}
+
+// random_shuffle() 将 [first, last) 的元素次序随机重排.
+// 在 N! 种可能的元素排列顺序中随机选出一种, 此处 N 为 last - first
+// random_shuffle 有两个版本. 版本一使用内部随机数产生器, 版本二使用一个会产生随机数的仿函数
+
+template <class RandomAccessIterator, class Distance>
+void __random_shuffle(RandomAccessIterator first, RandomAccessIterator last, Distance*)
+{
+    if (first == last) return;
+    for (RandomAccessIterator i = first + 1; i != last; ++i) {
+#ifdef __STL_NO_DRAND48
+        iter_swap(i, first + Distance(rand() % ((i - first) + 1)));
+#else
+        iter_swap(i, first + Distance(lrand48() % ((i - first) + 1)));
+#endif /* __STL_NO_DRAND48 */
+    }
+}
+
+// SGI 版本一
+template <class RandomAccessIterator>
+inline void random_shuffle(RandomAccessIterator first, RandomAccessIterator last)
+{
+    __random_shuffle(first, last, distance_type(first));
+}
+
+// SGI 版本二
+template <class RandomAccessIterator, class RandomNumberGenerator>
+void random_shuffle(RandomAccessIterator first, RandomAccessIterator last,
+                    RandomNumberGenerator& rand)    // 注意, by reference
+{
+    if (first == last) return;
+    for (RandomAccessIterator i = first + 1; i != last; ++i) {
+        iter_swap(i, first + rand((i - first) + 1));
+    }
+}
+
+// partial_sort() 接受一个 middle 迭代器, 然后重新安排 [first, last),
+// 使序列中的 middle-first 个最小元素, 以递增顺序排序, 置于 [first, middle) 内.
+// 其余 last-middle 个元素安置于 [middle, last) 中, 不保证有任何特定顺序
+
+template <class RandomAccessIterator, class T>
+void __partial_sort(RandomAccessIterator first, RandomAccessIterator middle,
+                    RandomAccessIterator last, T*)
+{
+    make_heap(first, middle);
+    // 以下的 i < last 判断操作, 只适用于 random iterator
+    for (RandomAccessIterator i = middle; i < last; ++i) {
+        if (*i < *first) {
+            __pop_heap(first, middle, i, T(*i), distance_type(first));
+        }
+    }
+    sort_heap(first, middle);
+}
+
+template <class RandomAccessIterator, class T, class Compare>
+void __partial_sort(RandomAccessIterator first, RandomAccessIterator middle,
+                    RandomAccessIterator last, T*, Compare comp)
+{
+    make_heap(first, middle);
+    // 以下的 i < last 判断操作, 只适用于 random iterator
+    for (RandomAccessIterator i = middle; i < last; ++i) {
+        if (comp(*i, *first)) {
+            __pop_heap(first, middle, i, T(*i), distance_type(first));
+        }
+    }
+    sort_heap(first, middle);
+}
+
+// 版本一
+template <class RandomAccessIterator>
+inline void partial_sort(RandomAccessIterator first, RandomAccessIterator middle,
+                         RandomAccessIterator last)
+{
+    __partial_sort(first, middle, last, value_type(first));
+}
+
+// 版本二
+template <class RandomAccessIterator, class Compare>
+inline void partial_sort(RandomAccessIterator first, RandomAccessIterator middle,
+                         RandomAccessIterator last, Compare comp)
+{
+    __partial_sort(first, middle, last, value_type(first), comp);
+}
+
+// partial_sort() 和 partial_sort_copy() 两者行为逻辑完全相同,
+// 后者将 last-first 个最小元素(或最大元素, 视 comp 而定) 排序后的
+// 所得结果置于 [result_first, result_last)
+
+template <class InputIterator, class RandomAccessIterator, class Distance, class T>
+RandomAccessIterator __partial_sort_copy(InputIterator first, InputIterator last,
+                                         RandomAccessIterator result_first,
+                                         RandomAccessIterator result_last, 
+                                         Distance*, T*) {
+    if (result_first == result_last) return result_last;
+    RandomAccessIterator result_real_last = result_first;
+    while(first != last && result_real_last != result_last) {
+        *result_real_last = *first;
+        ++result_real_last;
+        ++first;
+    }
+    make_heap(result_first, result_real_last);
+    while (first != last) {
+        if (*first < *result_first) {
+            __adjust_heap(result_first, Distance(0),
+                          Distance(result_real_last - result_first), T(*first));
+        }
+        ++first;
+    }
+    sort_heap(result_first, result_real_last);
+    return result_real_last;
+}
+
+// 版本一
+template <class InputIterator, class RandomAccessIterator>
+inline RandomAccessIterator partial_sort_copy(InputIterator first, InputIterator last,
+                                              RandomAccessIterator result_first,
+                                              RandomAccessIterator result_last) {
+    return __partial_sort_copy(first, last, result_first, result_last, 
+                               distance_type(result_first),
+                               value_type(first));
+}
+
+template <class InputIterator, class RandomAccessIterator, class Compare, class Distance, class T>
+RandomAccessIterator __partial_sort_copy(InputIterator first, InputIterator last,
+                                         RandomAccessIterator result_first,
+                                         RandomAccessIterator result_last,
+                                         Compare comp, Distance*, T*) {
+    if (result_first == result_last) return result_last;
+    RandomAccessIterator result_real_last = result_first;
+    while(first != last && result_real_last != result_last) {
+        *result_real_last = *first;
+        ++result_real_last;
+        ++first;
+    }
+    make_heap(result_first, result_real_last, comp);
+    while (first != last) {
+        if (comp(*first, *result_first)) {
+            __adjust_heap(result_first, Distance(0), Distance(result_real_last - result_first),
+                          T(*first), comp);
+        }
+        ++first;
+    }
+    sort_heap(result_first, result_real_last, comp);
+    return result_real_last;
+}
+
+// 版本二
+template <class InputIterator, class RandomAccessIterator, class Compare>
+inline RandomAccessIterator partial_sort_copy(InputIterator first, InputIterator last,
+                                              RandomAccessIterator result_first,
+                                              RandomAccessIterator result_last, Compare comp) { 
+  return __partial_sort_copy(first, last, result_first, result_last, comp,
+                             distance_type(result_first), value_type(first));
 }
 
 };  // namespace cstl
