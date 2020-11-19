@@ -1307,7 +1307,7 @@ inline ForwardIterator lower_bound(ForwardIterator first, ForwardIterator last,
                          distance_type(first), iterator_category(first));
 }
 
-// upper_bound() 是二分查找发的一个版本. 它试图在已排序的 [first, last) 中寻找 value.
+// upper_bound() 是二分查找法的一个版本. 它试图在已排序的 [first, last) 中寻找 value.
 // 返回 "在不破坏顺序的情况下, 可插入 value 的最后一个合适位置"
 
 // 版本一辅助函数的 forward_iterator 版本
@@ -1419,6 +1419,24 @@ inline ForwardIterator upper_bound(ForwardIterator first, ForwardIterator last,
 {
     return __upper_bound(first, last, value, comp,
                          distance_type(first), iterator_category(first));
+}
+
+// 算法 binary_search() 是一种二分查找法, 试图在已排序的 [first ,last) 中寻找元素 value
+// 版本一
+template <class ForwardIterator, class T>
+bool binary_search(ForwardIterator first, ForwardIterator last, const T& value)
+{
+    ForwardIterator i = lower_bound(first, last, value);
+    return i != last && !(value < *i);
+}
+
+// 版本二
+template <class ForwardIterator, class T, class Compare>
+bool binary_search(ForwardIterator first, ForwardIterator last,
+                   const T& value, Compare comp)
+{
+    ForwardIterator i = lower_bound(first, last, value, comp);
+    return i != last && !comp(value, *i);
 }
 
 };  // namespace cstl
