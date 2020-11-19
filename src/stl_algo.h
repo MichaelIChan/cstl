@@ -1193,6 +1193,234 @@ ForwardIterator unique(ForwardIterator first, ForwardIterator last)
     return unique_copy(first, last, first);
 }
 
+// lower_bound() 是二分查找的一种版本, 试图在已排序的 [first, last) 中寻找元素 value.
+// 如果 [first, last) 具有与 value 相等的元素, 便返回一个迭代器, 指向其中第一个元素.
+// 如果没有这样的元素存在, 便返回 "假设这样的元素存在时应该出现的位置"
+
+// 版本一辅助函数的 forward_iterator 版本
+template <class ForwardIterator, class T, class Distance>
+ForwardIterator __lower_bound(ForwardIterator first, ForwardIterator last, const T& value,
+                              Distance*, forward_iterator_tag)
+{
+    Distance len = 0;
+    distance(first, last, len);     // 求整个区间的长度 len
+    Distance half;
+    ForwardIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first;
+        advance(middle, half);
+        if (*middle < value) {
+            first = middle;
+            ++first;
+            len = len - half - 1;
+        } else {
+            len = half;
+        }
+    }
+    return first;
+}
+
+template <class ForwardIterator, class T, class Compare, class Distance>
+ForwardIterator __lower_bound(ForwardIterator first, ForwardIterator last, const T& value,
+                              Compare comp, Distance*, forward_iterator_tag)
+{
+    Distance len = 0;
+    distance(first, last, len);     // 求整个区间的长度 len
+    Distance half;
+    ForwardIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first;
+        advance(middle, half);
+        if (comp(*middle, value)) {
+            first = middle;
+            ++first;
+            len = len - half - 1;
+        } else {
+            len = half;
+        }
+    }
+    return first;
+}
+
+// 版本一辅助函数的 random_access_iterator 版本
+template <class RandomAccessIterator, class T, class Distance>
+RandomAccessIterator __lower_bound(RandomAccessIterator first, RandomAccessIterator last,
+                                   const T& value, Distance*, random_access_iterator_tag)
+{
+    Distance len = last - first;        // 求整个区间的长度 len
+    Distance half;
+    RandomAccessIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first + half;;
+        if (*middle < value) {
+            first = middle + 1;;
+            len = len - half - 1;
+        } else {
+            len = half;
+        }
+    }
+    return first;
+}
+
+template <class RandomAccessIterator, class T, class Compare, class Distance>
+RandomAccessIterator __lower_bound(RandomAccessIterator first, RandomAccessIterator last,
+                                   const T& value, Compare comp, Distance*,
+                                   random_access_iterator_tag)
+{
+    Distance len = last - first;        // 求整个区间的长度 len
+    Distance half;
+    RandomAccessIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first + half;;
+        if (comp(*middle, value)) {
+            first = middle + 1;;
+            len = len - half - 1;
+        } else {
+            len = half;
+        }
+    }
+    return first;
+}
+
+// lower_bound() 版本一
+template <class ForwardIterator, class T>
+inline ForwardIterator lower_bound(ForwardIterator first, ForwardIterator last, const T& value)
+{
+    return __lower_bound(first, last, value,
+                         distance_type(first), iterator_category(first));
+}
+
+// lower_bound() 版本二
+template <class ForwardIterator, class T, class Compare>
+inline ForwardIterator lower_bound(ForwardIterator first, ForwardIterator last,
+                                   const T& value, Compare comp)
+{
+    return __lower_bound(first, last, value, comp,
+                         distance_type(first), iterator_category(first));
+}
+
+// upper_bound() 是二分查找发的一个版本. 它试图在已排序的 [first, last) 中寻找 value.
+// 返回 "在不破坏顺序的情况下, 可插入 value 的最后一个合适位置"
+
+// 版本一辅助函数的 forward_iterator 版本
+template <class ForwardIterator, class T, class Distance>
+ForwardIterator __upper_bound(ForwardIterator first, ForwardIterator last,
+                              const T& value, Distance*, forward_iterator_tag)
+{
+    Distance len = 0;
+    distance(first, last, len);
+    Distance half;
+    ForwardIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first;
+        advance(middle, half);
+        if (value < *middle) {
+            len = half;
+        } else {
+            first = middle;
+            ++first;
+            len = len - half - 1;
+        }
+    }
+    return first;
+}
+
+template <class ForwardIterator, class T, class Compare, class Distance>
+ForwardIterator __upper_bound(ForwardIterator first, ForwardIterator last, const T& value,
+                              Compare comp, Distance*, forward_iterator_tag)
+{
+    Distance len = 0;
+    distance(first, last, len);
+    Distance half;
+    ForwardIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first;
+        advance(middle, half);
+        if (comp(value, *middle)) {
+            len = half;
+        } else {
+            first = middle;
+            ++first;
+            len = len - half - 1;
+        }
+    }
+    return first;
+}
+
+// 版本一辅助函数的 random_access_iterator 版本
+template <class RandomAccessIterator, class T, class Distance>
+RandomAccessIterator __upper_bound(RandomAccessIterator first, RandomAccessIterator last,
+                                   const T& value, Distance*, random_access_iterator_tag)
+{
+    Distance len = last - first;
+    Distance half;
+    RandomAccessIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first + half;
+        if (value < *middle) {
+            len = half;
+        } else {
+            first = middle + 1;
+            len = len - half - 1;
+        }
+    }
+    return first;
+}
+
+template <class RandomAccessIterator, class T, class Compare, class Distance>
+RandomAccessIterator __upper_bound(RandomAccessIterator first, RandomAccessIterator last,
+                                   const T& value, Compare comp, Distance*,
+                                   random_access_iterator_tag)
+{
+    Distance len = last - first;
+    Distance half;
+    RandomAccessIterator middle;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first + half;
+        if (comp(value, *middle)) {
+            len = half;
+        } else {
+            first = middle + 1;
+            len = len - half - 1;
+        }
+    }
+    return first;
+}
+
+// upper_bound() 版本一
+template <class ForwardIterator, class T>
+inline ForwardIterator upper_bound(ForwardIterator first, ForwardIterator last,
+                                   const T& value)
+{
+    return __upper_bound(first, last, value,
+                         distance_type(first), iterator_category(first));
+}
+
+// upper_bound() 版本二
+template <class ForwardIterator, class T, class Compare>
+inline ForwardIterator upper_bound(ForwardIterator first, ForwardIterator last,
+                                   const T& value, Compare comp)
+{
+    return __upper_bound(first, last, value, comp,
+                         distance_type(first), iterator_category(first));
+}
+
 };  // namespace cstl
 
 #endif /* __STL_ALGO_H */
