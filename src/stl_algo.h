@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 
+#include "stl_tempbuf.h"
 #include "stl_algobase.h"
 #include "stl_heap.h"
 #include "stl_pair.h"
@@ -2049,6 +2050,170 @@ equal_range(ForwardIterator first, ForwardIterator last, const T& value, Compare
 {
     return __equal_range(first, last, value,
                          distance_type(first), iterator_category(first), comp);
+}
+
+// inplace_merge
+// 如果两个连接在一起的序列 [first, middle) 和 [middle, last) 都已排序,
+// 那么 inplace_merge 可将它们结合成单一一个序列, 并仍保有序性
+
+template <class InputIterator1, class InputIterator2, class OutputIterator>
+OutputIterator merge(InputIterator1 first1, InputIterator1 last1,
+                     InputIterator2 first2, InputIterator2 last2,
+                     OutputIterator result) {
+    while (first1 != last1 && first2 != last2) {
+        if (*first2 < *first1) {
+            *result = *first2;
+            ++first2;
+        } else {
+            *result = *first1;
+            ++first1;
+        }
+        ++result;
+    }
+    return copy(first2, last2, copy(first1, last1, result));
+}
+
+template <class InputIterator1, class InputIterator2, class OutputIterator, class Compare>
+OutputIterator merge(InputIterator1 first1, InputIterator1 last1,
+                     InputIterator2 first2, InputIterator2 last2,
+                     OutputIterator result, Compare comp) {
+    while (first1 != last1 && first2 != last2) {
+        if (comp(*first2, *first1)) {
+            *result = *first2;
+            ++first2;
+        } else {
+            *result = *first1;
+            +first1;
+        }
+        ++result;
+    }
+    return copy(first2, last2, copy(first1, last1, result));
+}
+
+template <class BidirectionalIterator, class Distance>
+void __merge_without_buffer(BidirectionalIterator first, BidirectionalIterator middle,
+                            BidirectionalIterator last, Distance len1, Distance len2)
+{
+    if (len1 == 0 || len2 == 0) {
+        return;
+    }
+    if (len1 + len2 == 2) {
+        if (*middle < *first) {
+            iter_swap(first, middle);
+        }
+        return;
+    }
+    BidirectionalIterator first_cut = first;
+    BidirectionalIterator second_cut = middle;
+    Distance len11 = 0;
+    Distance len22 = 0;
+    if (len1 > len2) {
+        len11 = len1 / 2;
+        advance(first_cut, len11);
+        second_cut = lower_bound(middle, last, *first_cut);
+        distance(middle, second_cut, len22);
+    } else {
+        len22 = len2 / 2;
+        advance(second_cut, len22);
+        first_cut = upper_bound(first, middle, *second_cut);
+        distance(first, first_cut, len11);
+    }
+    BidirectionalIterator new_middle = rotate(first_cut, middle, second_cut);
+    __merge_without_buffer(first, first_cut, new_middle, len11, len22);
+    __merge_without_buffer(new_middle, second_cut, last, len1 - len11, len2 - len22);
+}
+
+template <class BidirectionalIterator, class Distance, class Compare>
+void __merge_without_buffer(BidirectionalIterator first, BidirectionalIterator middle,
+                            BidirectionalIterator last, Distance len1, Distance len2,
+                            Compare comp) {
+    if (len1 == 0 || len2 == 0) {
+        return;
+    }
+    if (len1 + len2 == 2) {
+        if (comp(*middle, *first)) {
+            iter_swap(first, middle);
+        }
+        return;
+    }
+    BidirectionalIterator first_cut = first;
+    BidirectionalIterator second_cut = middle;
+    Distance len11 = 0;
+    Distance len22 = 0;
+    if (len1 > len2) {
+        len11 = len1 / 2;
+        advance(first_cut, len11);
+        second_cut = lower_bound(middle, last, *first_cut, comp);
+        distance(middle, second_cut, len22);
+    } else {
+        len22 = len2 / 2;
+        advance(second_cut, len22);
+        first_cut = upper_bound(first, middle, *second_cut, comp);
+        distance(first, first_cut, len11);
+    }
+    BidirectionalIterator new_middle = rotate(first_cut, middle, second_cut);
+    __merge_without_buffer(first, first_cut, new_middle, len11, len22, comp);
+    __merge_without_buffer(new_middle, second_cut, last, len1 - len11, len2 - len22, comp);
+}
+
+template <class BidirectionalIterator1, class BidirectionalIterator2,
+          class BidirectionalIterator3>
+BidirectionalIterator3 __merge_backward(BidirectionalIterator1 first1, BidirectionalIterator1 last1,
+                                        BidirectionalIterator2 first2, BidirectionalIterator2 last2,
+                                        BidirectionalIterator3 result) {
+    if (first1 == last1) {
+        return copy_backward(first2, last2, result);
+    }
+    if (first2 == last2) {
+        return copy_backward(first1, last1, result);
+    }
+    --last1;
+    --last2;
+    while (true) {
+        if (*last2 < *last1) {
+             *--result = *last1;
+            if (first1 == last1) {
+                return copy_backward(first2, ++last2, result);
+            }
+            --last1;
+        } else {
+            *--result = *last2;
+            if (first2 == last2) {
+                return copy_backward(first1, ++last1, result);
+            }
+            --last2;
+        }
+    }
+}
+
+template <class BidirectionalIterator1, class BidirectionalIterator2,
+          class BidirectionalIterator3, class Compare>
+BidirectionalIterator3 __merge_backward(BidirectionalIterator1 first1, BidirectionalIterator1 last1,
+                                        BidirectionalIterator2 first2, BidirectionalIterator2 last2,
+                                        BidirectionalIterator3 result, Compare comp) {
+    if (first1 == last1) {
+        return copy_backward(first2, last2, result);
+    }
+    if (first2 == last2) {
+        return copy_backward(first1, last1, result);
+    }
+    --last1;
+    --last2;
+    while (true) {
+        if (comp(*last2, *last1)) {
+            *--result = *last1;
+            if (first1 == last1) {
+                eturn copy_backward(first2, ++last2, result);
+            }
+            --last1;
+        } else {
+            *--result = *last2;
+            if (first2 == last2) {
+                return copy_backward(first1, ++last1, result);
+            }
+            --last2;
+        }
+    }
 }
 
 };  // namespace cstl
