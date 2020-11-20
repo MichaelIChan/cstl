@@ -5,6 +5,7 @@
 
 #include "stl_algobase.h"
 #include "stl_heap.h"
+#include "stl_pair.h"
 
 namespace cstl
 {
@@ -1906,6 +1907,148 @@ inline void sort(RandomAccessIterator first, RandomAccessIterator last)
         __introsort_loop(first, last, value_type(first), __lg(last - first) * 2);
         __final_insertion_sort(first, last);
     }
+}
+
+// equal_range() 是二分查找法的一个版本, 试图在已排序的 [first, last) 中寻找 value
+// 返回一对迭代器 i 和 j, 其中 i 是在不破坏次序的前提下, value 可插入的第一个位置,
+// j 是在不破坏次序的前提下, value 可插入的最后一个位置.
+
+// 版本一的 random_access_iterator 版本
+template <class RandomAccessIterator, class T, class Distance>
+pair<RandomAccessIterator, RandomAccessIterator>
+__equal_range(RandomAccessIterator first, RandomAccessIterator last,
+              const T& value, Distance*, random_access_iterator_tag)
+{
+    Distance len = last - first;
+    Distance half;
+    RandomAccessIterator middle, left, right;
+
+    while (len > 0) {
+        half = len >> 1;                // 找出中央位置
+        middle = first + half;          // 设定中央迭代器
+        if (*middle < value) {
+            first = middle + 1;         // 将运作区间缩小(移至后半段), 以提高效率
+            len = len - half - 1;
+        } else if (value < *middle) {
+            len = half;                 // 将运作区间缩小(移至前半段), 以提高效率
+        } else {    // 中央元素等于指定值
+            // 在前半段找 lower_bound
+            left = lower_bound(first, middle, value);
+            // 在后半段找 upper_bound
+            right = upper_bound(++middle, first + len, value);
+            return pair<RandomAccessIterator, RandomAccessIterator>(left, right);
+        }
+    }
+    // 整个区间内都没有匹配的值, 那么应该返回一对迭代器, 指向第一个大于 value 的元素
+    return pair<RandomAccessIterator, RandomAccessIterator>(first, first);
+}
+
+template <class RandomAccessIterator, class T, class Distance, class Compare>
+pair<RandomAccessIterator, RandomAccessIterator>
+__equal_range(RandomAccessIterator first, RandomAccessIterator last,
+              const T& value, Distance*, random_access_iterator_tag, Compare comp)
+{
+    Distance len = last - first;
+    Distance half;
+    RandomAccessIterator middle, left, right;
+
+    while (len > 0) {
+        half = len >> 1;                // 找出中央位置
+        middle = first + half;          // 设定中央迭代器
+        if (comp(*middle, value)) {
+            first = middle + 1;         // 将运作区间缩小(移至后半段), 以提高效率
+            len = len - half - 1;
+        } else if (comp(value, *middle)) {
+            len = half;                 // 将运作区间缩小(移至前半段), 以提高效率
+        } else {    // 中央元素等于指定值
+            // 在前半段找 lower_bound
+            left = lower_bound(first, middle, value);
+            // 在后半段找 upper_bound
+            right = upper_bound(++middle, first + len, value);
+            return pair<RandomAccessIterator, RandomAccessIterator>(left, right);
+        }
+    }
+    // 整个区间内都没有匹配的值, 那么应该返回一对迭代器, 指向第一个大于 value 的元素
+    return pair<RandomAccessIterator, RandomAccessIterator>(first, first);
+}
+
+// 版本一的 forward_iterator 版本
+template <class ForwardIterator, class T, class Distance>
+pair<ForwardIterator, ForwardIterator>
+__equal_range(ForwardIterator first, ForwardIterator last,
+              const T& value, Distance*, forward_iterator_tag)
+{
+    Distance len = 0;
+    distance(first, last, len);
+    Distance half;
+    ForwardIterator middle, left, right;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first;
+        advance(middle, half);
+        if (*middle < value) {
+            first = middle;
+            ++first;
+            len = len - half - 1;
+        } else if (value < *middle) {
+            len = half;
+        } else {
+            left = lower_bound(first, middle, value);
+            advance(first, len);
+            right = upper_bound(++middle, first, value);
+            return pair<ForwardIterator, ForwardIterator>(left, right);
+        }
+    }
+    return pair<ForwardIterator, ForwardIterator>(first, first);
+}
+
+template <class ForwardIterator, class T, class Distance, class Compare>
+pair<ForwardIterator, ForwardIterator>
+__equal_range(ForwardIterator first, ForwardIterator last,
+              const T& value, Distance*, forward_iterator_tag, Compare comp)
+{
+    Distance len = 0;
+    distance(first, last, len);
+    Distance half;
+    ForwardIterator middle, left, right;
+
+    while (len > 0) {
+        half = len >> 1;
+        middle = first;
+        advance(middle, half);
+        if (comp(*middle, value)) {
+            first = middle;
+            ++first;
+            len = len - half - 1;
+        } else if (comp(value, *middle)) {
+            len = half;
+        } else {
+            left = lower_bound(first, middle, value);
+            advance(first, len);
+            right = upper_bound(++middle, first, value);
+            return pair<ForwardIterator, ForwardIterator>(left, right);
+        }
+    }
+    return pair<ForwardIterator, ForwardIterator>(first, first);
+}
+
+// 版本一
+template <class ForwardIterator, class T>
+inline pair<ForwardIterator, ForwardIterator>
+equal_range(ForwardIterator first, ForwardIterator last, const T& value)
+{
+    return __equal_range(first, last, value,
+                         distance_type(first), iterator_category(first));
+}
+
+// 版本二
+template <class ForwardIterator, class T, class Compare>
+inline pair<ForwardIterator, ForwardIterator>
+equal_range(ForwardIterator first, ForwardIterator last, const T& value, Compare comp)
+{
+    return __equal_range(first, last, value,
+                         distance_type(first), iterator_category(first), comp);
 }
 
 };  // namespace cstl
