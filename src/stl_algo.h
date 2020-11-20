@@ -1715,6 +1715,199 @@ inline RandomAccessIterator partial_sort_copy(InputIterator first, InputIterator
                              distance_type(result_first), value_type(first));
 }
 
+// insertion sort
+
+// 版本一辅助函数 __unguarded_linear_insert()
+template <class RandomAccessIterator, class T>
+void __unguarded_linear_insert(RandomAccessIterator last, T value)
+{
+    RandomAccessIterator next = last;
+    --next;
+    // insertion sort 的内循环
+    // 注意, 一旦不再出现逆转对 (inversion), 循环就可以结束了
+    while (value < *next) {     // 逆转对 (inversion) 存在
+        *last = *next;          // 调整
+        last = next;            // 调整迭代器
+        --next;                 // 左移一个位置
+    }
+    *last = value;              // value 的正确落脚处
+}
+
+template <class RandomAccessIterator, class T, class Compare>
+void __unguarded_linear_insert(RandomAccessIterator last, T value, Compare comp)
+{
+    RandomAccessIterator next = last;
+    --next;
+    // insertion sort 的内循环
+    // 注意, 一旦不再出现逆转对 (inversion), 循环就可以结束了
+    while (comp(value, *next)) {    // 逆转对 (inversion) 存在
+        *last = *next;              // 调整
+        last = next;                // 调整迭代器
+        --next;                     // 左移一个位置
+    }
+    *last = value;                  // value 的正确落脚处
+}
+
+// 版本一辅助函数 __linear_insert()
+template <class RandomAccessIterator, class T>
+inline void __linear_insert(RandomAccessIterator first, RandomAccessIterator last, T*)
+{
+    T value = *last;
+    if (comp(value, *first)) {                           // 尾元素比头元素小
+        copy_backward(first, last, last + 1);       // 将整个区间向右递移一个位置
+        *first = value;                             // 令头元素等于原先的尾元素值
+    } else {
+        __unguarded_linear_insert(last, value);
+    }
+}
+
+template <class RandomAccessIterator, class T, class Compare>
+inline void __linear_insert(RandomAccessIterator first, RandomAccessIterator last,
+                            T*, Compare comp)
+{
+    T value = *last;
+    if (value < *first) {                           // 尾元素比头元素小
+        copy_backward(first, last, last + 1);       // 将整个区间向右递移一个位置
+        *first = value;                             // 令头元素等于原先的尾元素值
+    } else {
+        __unguarded_linear_insert(last, value, comp);
+    }
+}
+
+// __insertion_sort() 版本一
+template <class RandomAccessIterator>
+void __insertion_sort(RandomAccessIterator first, RandomAccessIterator last)
+{
+    if (first == last) return;
+    for (RandomAccessIterator i = first + 1; i != last; ++i) {  // 外循环
+        __linear_insert(first, i, value_type(first));
+        // 以上, [first, i) 形成一个子区间
+    }
+}
+
+// __insertion_sort() 版本二
+template <class RandomAccessIterator, class Compare>
+void __insertion_sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
+{
+    if (first == last) return;
+    for (RandomAccessIterator i = first + 1; i != last; ++i) {  // 外循环
+        __linear_insert(first, i, value_type(first), comp);
+        // 以上, [first, i) 形成一个子区间
+    }
+}
+
+// quick sort
+
+// 返回 a, b, c 之居中者
+template <class T>
+inline const T& __median(const T& a, const T& b, const T& c)
+{
+    if (a < b) {
+        if (b < c) {        // a < b < c
+            return b;
+        } else if (a < c) { // a < b, b >= c, a < c
+            return c;
+        } else {
+            return a;
+        }
+    } else if (a < c) {     // c > a >= b
+        return a;
+    } else if (b < c) {     // a >= b, a >= c, b < c
+        return c;
+    } else {
+        return b;
+    }
+}
+
+// 分割函数, 其返回值是分割后的右段第一个位置
+template <class RandomAccessIterator, class T>
+RandomAccessIterator __unguarded_partition(RandomAccessIterator first,
+                                           RandomAccessIterator last, T pivot)
+{
+    while (true) {
+        while (*first < pivot) ++first;         // first 找到 >= pivot 的元素就停下来
+        --last;                                 // 调整
+        while (pivot < *last) --last;           // last 找到 <= pivot 的元素就停下来
+        // 注意, 以下 first < last 判断操作, 只适用于 random iterator
+        if (!(first < last)) return first;      // 交错, 结束循环
+        iter_swap(first, last);                 // 大小值交换
+        ++first;                                // 调整
+    }
+}
+
+// SGI STL sort
+
+// __lg() 用来控制分割恶化的情况
+// 找出 2 ^ k <= n 的最大值 k
+template <class Size>
+inline Size __lg(Size n)
+{
+    Size k;
+    for (k = 0; n > 1; n >>= 1) ++k;
+    return k;
+}
+
+const int __stl_threshold = 16;
+
+// 当元素个数为 40 时, __introsort_loop() 的最后一个参数将是 5 * 2, 即最多允许分割 10 层
+// 注意, 本函数内的许多迭代器运算操作, 都只适用于 RandomAccess Iterator
+template <class RandomAccessIterator, class T, class Size>
+void __introsort_loop(RandomAccessIterator first, RandomAccessIterator last,
+                      T*, Size depth_limit)
+{
+    while (last - first > __stl_threshold) {
+        if (depth_limit == 0) {                 // 至此, 分割恶化
+            partial_sort(first, last, last);    // 改用 heapsort
+            return;
+        }
+        --depth_limit;
+        // 以下是 median-of-3 partition, 选择一个够好的枢轴并决定分割点
+        // 分割点将落在迭代器 cut 身上
+        RandomAccessIterator cut = __unguarded_partition(first, last,
+                        T(__median(*first, *(first + (last - first) / 2, *(last - 1)))));
+        // 对右半段递归进行 sort
+        __introsort_loop(cut, last, value_type(first), depth_limit);
+        last = cut;
+        // 现在回到 while 循环, 准备对左半段递归进行 sort
+    }
+}
+
+template <class RandomAccessIterator>
+void __final_insertion_sort(RandomAccessIterator first, RandomAccessIterator last)
+{
+    if (last - first > __stl_threshold) {
+        __insertion_sort(first, first + __stl_threshold);
+        __unguarded_insertion_sort(first + __stl_threshold, last);
+    } else {
+        __insertion_sort(first, last);
+    }
+}
+
+template <class RandomAccessIterator>
+inline void __unguarded_insertion_sort(RandomAccessIterator first, RandomAccessIterator last)
+{
+    __unguarded_insertion_sort_aux(first, last, value_type(first));
+}
+
+template <class RandomAccessIterator, class T>
+inline void __unguarded_insertion_sort_aux(RandomAccessIterator first, RandomAccessIterator last,
+                                       T*)
+{
+    for (RandomAccessIterator i = first; i != last; ++i) {
+        __unguarded_linear_insert(i, T(*i));
+    }
+}
+
+// sort() 只适用于 RandomAccessIterator
+template <class RandomAccessIterator>
+inline void sort(RandomAccessIterator first, RandomAccessIterator last)
+{
+    if (first != last) {
+        __introsort_loop(first, last, value_type(first), __lg(last - first) * 2);
+        __final_insertion_sort(first, last);
+    }
+}
+
 };  // namespace cstl
 
 #endif /* __STL_ALGO_H */
