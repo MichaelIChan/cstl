@@ -1837,6 +1837,21 @@ RandomAccessIterator __unguarded_partition(RandomAccessIterator first,
     }
 }
 
+template <class RandomAccessIterator, class T, class Compare>
+RandomAccessIterator __unguarded_partition(RandomAccessIterator first, 
+                                           RandomAccessIterator last, 
+                                           T pivot, Compare comp) 
+{
+    while (true) {
+        while (comp(*first, pivot)) ++first;
+        --last;
+        while (comp(pivot, *last)) --last;
+        if (!(first < last)) return first;
+        iter_swap(first, last);
+        ++first;
+    }
+}
+
 // SGI STL sort
 
 // __lg() 用来控制分割恶化的情况
@@ -2372,6 +2387,77 @@ inline void inplace_merge(BidirectionalIterator first, BidirectionalIterator mid
 {
     if (first == middle || middle == last) return;
     __inplace_merge_aux(first, middle, last, value_type(first), distance_type(first), comp);
+}
+
+// nth_element() 会重新排列 [first, last), 使迭代器 nth 所指的元素,
+// 与 "整个 [first, last) 完整排序后, 同一位置的元素" 同值,
+// 并保证 [nth, last) 内没有任何一个元素不大于 [first, nth) 内的元素
+
+// 版本一辅助函数
+template <class RandomAccessIterator, class T>
+void __nth_element(RandomAccessIterator first, RandomAccessIterator nth,
+                   RandomAccessIterator last, T*)
+{
+    while (last - first > 3) {
+        RandomAccessIterator cut =
+            __unguarded_partition(first, last,
+                T(__median(*first, *(first + (last - first) / 2), *(last - 1))));
+        if (cut <= nth) {   // 右段起点 <= 指定位置 (nth 落于右段)
+            first = cut;    // 再对右段实施分割
+        } else {            // 否则 (nth 落于左段)
+            last = cut;     // 对左段实施分割
+        }
+    }
+    __insertion_sort(first, last);
+}
+
+template <class RandomAccessIterator, class T, class Compare>
+void __nth_element(RandomAccessIterator first, RandomAccessIterator nth,
+                   RandomAccessIterator last, T*, Compare comp)
+{
+    while (last - first > 3) {
+        RandomAccessIterator cut =
+            __unguarded_partition(first, last,
+                T(__median(*first, *(first + (last - first) / 2), *(last - 1))), comp);
+        if (cut <= nth) {   // 右段起点 <= 指定位置 (nth 落于右段)
+            first = cut;    // 再对右段实施分割
+        } else {            // 否则 (nth 落于左段)
+            last = cut;     // 对左段实施分割
+        }
+    }
+    __insertion_sort(first, last, comp);
+}
+
+// nth_element() 版本一
+template <class RandomAccessIterator>
+inline void nth_element(RandomAccessIterator first, RandomAccessIterator nth,
+                        RandomAccessIterator last)
+{
+    __nth_element(first, nth, last, value_type(first));
+}
+
+// nth_element() 版本二
+template <class RandomAccessIterator, class Compare>
+inline void nth_element(RandomAccessIterator first, RandomAccessIterator nth,
+                        RandomAccessIterator last, Compare comp)
+{
+    __nth_element(first, nth, last, value_type(first), comp);
+}
+
+// merge sort()
+template <class BidirectionalIterator>
+void mergesort(BidirectionalIterator first, BidirectionalIterator last)
+{
+    typename iterator_traits<BidirectionalIterator>::difference_type n
+        = distance(first, last);
+    if (n == 0 || n == 1) {
+        return;
+    } else {
+        BidirectionalIterator mid = first + n / 2;
+        mergesort(first, mid);
+        mergesort(mid, last);
+        inplace_merge(first, mid, last);
+    }
 }
 
 };  // namespace cstl
