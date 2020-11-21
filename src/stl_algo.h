@@ -2216,6 +2216,164 @@ BidirectionalIterator3 __merge_backward(BidirectionalIterator1 first1, Bidirecti
     }
 }
 
+// __rotate_adaptive() 和 rotate() 没有什么不同, 只是针对缓冲区的存在, 做了优化.
+// 万一缓冲区不足, 最终还是交给 rotate() 执行
+template <class BidirectionalIterator1, class BidirectionalIterator2, class Distance>
+BidirectionalIterator1 __rotate_adaptive(BidirectionalIterator1 first,
+                                         BidirectionalIterator1 middle,
+                                         BidirectionalIterator1 last,
+                                         Distance len1, Distance len2,
+                                         BidirectionalIterator2 buffer,
+                                         Distance buffer_size)
+{
+    BidirectionalIterator2 buffer_end;
+    if (len1 > len2 && len2 <= buffer_size) {
+        // 缓冲区足够安置序列二
+        buffer_end = copy(middle, last, buffer);
+        copy_backward(first, middle, last);
+        return copy(buffer, buffer_end, first);
+    } else if (len1 <= buffer_size) {
+        // 缓冲区足够安置序列一
+        buffer_end = copy(first, middle, buffer);
+        copy(middle, last, first);
+        return copy_backward(buffer, buffer_end, last);
+    } else {
+        // 缓冲区不足, 改用 rotate 算法
+        rotate(first, middle, last);
+        advance(first, len2);
+        return first;
+    }
+}
+
+// 复制函数, 有缓冲区的情况下
+template <class BidirectionalIterator, class Distance, class Pointer>
+void __merge_adaptive(BidirectionalIterator first, BidirectionalIterator middle,
+                      BidirectionalIterator last, Distance len1, Distance len2,
+                      Pointer buffer, Distance buffer_size)
+{
+    if (len1 <= len2 && len1 <= buffer_size) {
+        // case1. 缓冲区足够安置序列一
+        Pointer end_buffer = copy(first, middle, buffer);
+        merge(buffer, end_buffer, middle, last, first);
+    } else if (len2 <= buffer_size) {
+        // case2. 缓冲区足够安置序列二
+        Pointer end_buffer = copy(middle, last, buffer);
+        __merge_backward(first, middle, buffer, end_buffer, last);
+    } else {
+        // case3. 缓冲区空间不足安置任何一个序列
+        BidirectionalIterator first_cut = first;
+        BidirectionalIterator second_cut = middle;
+        Distance len11 = 0;
+        Distance len22 = 0;
+        if (len1 > len2) {
+            len11 = len1 / 2;
+            advance(first_cut, len11);
+            second_cut = lower_bound(middle, last, *first_cut);
+            distance(middle, second_cut, len22);
+        } else {
+            len22 = len2 / 2;
+            advance(second_cut, len22);
+            first_cut = upper_bound(first, middle, *second_cut);
+            distance(first, first_cut, len11);
+        }
+        BidirectionalIterator new_middle =
+            __rotate_adaptive(first_cut, middle, second_cut, len1 - len11,
+                              len22, buffer, buffer_size);
+        // 针对左段, 递归调用
+        __merge_adaptive(first, first_cut, new_middle, len11, len22, buffer, buffer_size);
+        // 针对右段, 递归调用
+        __merge_adaptive(new_middle, second_cut, last, len1 - len11,
+                         len2 - len22, buffer, buffer_size);
+    }
+}
+
+template <class BidirectionalIterator, class Distance, class Pointer, class Compare>
+void __merge_adaptive(BidirectionalIterator first, BidirectionalIterator middle,
+                      BidirectionalIterator last, Distance len1, Distance len2,
+                      Pointer buffer, Distance buffer_size, Compare comp)
+{
+    if (len1 <= len2 && len1 <= buffer_size) {
+        Pointer buffer_end = copy(first, middle, buffer);
+        merge(buffer, buffer_end, middle, last, first, comp);
+    } else if (len2 <= buffer_size) {
+        Pointer buffer_end = copy(middle, last, buffer);
+        __merge_backward(first, middle, buffer, buffer_end, last, comp);
+    } else {
+        BidirectionalIterator first_cut = first;
+        BidirectionalIterator second_cut = middle;
+        Distance len11 = 0;
+        Distance len22 = 0;
+        if (len1 > len2) {
+            len11 = len1 / 2;
+            advance(first_cut, len11);
+            second_cut = lower_bound(middle, last, *first_cut, comp);
+            distance(middle, second_cut, len22);   
+        } else {
+            len22 = len2 / 2;
+            advance(second_cut, len22);
+            first_cut = upper_bound(first, middle, *second_cut, comp);
+            distance(first, first_cut, len11);
+        }
+        BidirectionalIterator new_middle =
+            __rotate_adaptive(first_cut, middle, second_cut, len1 - len11,
+                              len22, buffer, buffer_size);
+        __merge_adaptive(first, first_cut, new_middle, len11, len22, buffer, buffer_size, comp);
+        __merge_adaptive(new_middle, second_cut, last, len1 - len11,
+                         len2 - len22, buffer, buffer_size, comp);
+    }
+}
+
+template <class BidirectionalIterator, class T, class Distance>
+inline void __inplace_merge_aux(BidirectionalIterator first, BidirectionalIterator middle,
+                                BidirectionalIterator last, T*, Distance*)
+{
+    Distance len1 = 0;
+    distance(first middle, len1);
+    Distance len2 = 0;
+    distance(middle, last, len2);
+
+    temporary_buffer<BidirectionalIterator, T> buf(first, last);
+    if (buf.begin() == 0) {     // 内存配置失败
+        __merge_without_buffer(first, middle, last, len1, len2);
+    } else {                    // 在有暂时缓冲区的情况下进行
+        __merge_adaptive(first, middle, last, len1, len2, buf.begin(), Distance(buf.size()));
+    }
+}
+
+template <class BidirectionalIterator, class T, class Distance, class Compare>
+inline void __inplace_merge_aux(BidirectionalIterator first, BidirectionalIterator middle,
+                                BidirectionalIterator last, T*, Distance*, Compare comp)
+{
+    Distance len1 = 0;
+    distance(first, middle, len1);
+    Distance len2 = 0;
+    distance(middle, last, len2);
+
+    temporary_buffer<BidirectionalIterator, T> buf(first, last);
+    if (buf.begin() == 0) {
+        __merge_without_buffer(first, middle, last, len1, len2, comp);
+    } else {
+        __merge_adaptive(first, middle, last, len1, len2, buf.begin(), Distance(buf.size()), comp);
+    }
+}
+
+template <class BidirectionalIterator>
+inline void inplace_merge(BidirectionalIterator first, BidirectionalIterator middle,
+                          BidirectionalIterator last)
+{
+    // 只要有一个序列为空, 就什么都不必做
+    if (first == middle || middle == last) return;
+    __inplace_merge_aux(first, middle, last, value_type(first), distance_type(first));
+}
+
+template <class BidirectionalIterator, class Compare>
+inline void inplace_merge(BidirectionalIterator first, BidirectionalIterator middle,
+                          BidirectionalIterator last, Compare comp)
+{
+    if (first == middle || middle == last) return;
+    __inplace_merge_aux(first, middle, last, value_type(first), distance_type(first), comp);
+}
+
 };  // namespace cstl
 
 #endif /* __STL_ALGO_H */
