@@ -3,6 +3,9 @@
 
 #include <cstddef>      // for ptrdiff_t
 
+namespace cstl
+{
+
 // 五种迭代器类型
 struct input_iterator_tag { };
 struct output_iterator_tag { };
@@ -310,4 +313,114 @@ operator+(typename reverse_iterator<_Iterator>::difference_type __n,
   return reverse_iterator<_Iterator>(__x.base() - __n);
 }
 
-#endif
+// 这是一个迭代器配接器(iterator adapter), 用来将某个迭代器的赋值(assign)
+// 操作修改为插入(insert)操作 -- 从容器的尾端插入进去
+template <class Container>
+class back_insert_iterator {
+protected:
+    Container* container;
+public:
+    typedef output_iterator_tag iterator_category;
+    typedef void                value_type;
+    typedef void                difference_type;
+    typedef void                pointer;
+    typedef void                reference;
+
+    // 下面这个 ctor 使 back_insert_iterator 与容器绑定起来
+    explicit back_insert_iterator(Container& x) : container(&x) { }
+    back_insert_iterator<Container>& operator=(const typename Container::value_type& value)
+    {
+        container->push_back(value);
+        return *this;
+    }
+
+    // 以下三个操作符对 back_insert_iterator 不起作用 (关闭功能)
+    // 三个操作符返回的都是 back_insert_iterator 自己
+    back_insert_iterator<Container>& operator*() { return *this; }
+    back_insert_iterator<Container>& operator++() { return *this; }
+    back_insert_iterator<Container>& operator++(int) { return *this; }
+};
+
+// 这是一个辅助函数, 帮助我们方便使用 back_insert_iterator
+template <class Container>
+inline back_insert_iterator<Container> back_inserter(Container& x)
+{
+    return back_insert_iterator<Container>(x);
+}
+
+// 这是一个迭代器配接器(iterator adapter), 用来将某个迭代器的赋值(assign)
+// 操作修改为插入(insert)操作 -- 从容器的头端插入进去
+// 注意, 该迭代器不适用于 vector, 因为 vector 没有提供 push_front 函数
+template <class Container>
+class front_insert_iterator {
+protected:
+    Container* container;
+public:
+    typedef output_iterator_tag iterator_category;
+    typedef void                value_type;
+    typedef void                difference_type;
+    typedef void                pointer;
+    typedef void                reference;
+
+    explicit front_insert_iterator(Container& x) : container(&x) { }
+    front_insert_iterator<Container>& operator=(const typename Container::value_type& value)
+    {
+        container->push_front(value);
+        return *this;
+    }
+
+    // 以下三个操作符对 front_insert_iterator 不起作用 (关闭功能)
+    // 三个操作符返回的都是 front_insert_iterator 自己
+    front_insert_iterator<Container>& operator*() { return *this; }
+    front_insert_iterator<Container>& operator++() { return *this; }
+    front_insert_iterator<Container>& operator++(int) { return *this; }
+};
+
+// 这是一个辅助函数, 帮助我们方便使用 front_insert_iterator
+template <class Container>
+inline front_insert_iterator<Container> front_inserter(Container& x)
+{
+    return front_insert_iterator<Container>(x);
+}
+
+// 这是一个迭代器配接器(iterator adapter), 用来将某个迭代器的赋值(assign)
+// 操作修改为插入(insert)操作, 在指定的位置上进行, 并将迭代器右移一个位置,
+// 如此便可很方便地连续执行 "表面上是赋值(覆写)而实际上是插入" 的操作
+template <class Container>
+class insert_iterator {
+protected:
+    Container* container;
+    typename Container::iterator iter;
+public:
+    typedef output_iterator_tag iterator_category;
+    typedef void                value_type;
+    typedef void                difference_type;
+    typedef void                pointer;
+    typedef void                reference;
+
+    insert_iterator(Container& x, typename Container::iterator i) : container(&x), iter(i) { }
+    insert_iterator<Container>& operator=(const typename Container::value_type& value)
+    {
+        iter = container->insert(iter, value);  // 这里是关键, 转而调用 insert()
+        ++iter;                                 // 使 insert iterator 永远随其目标贴身移动
+        return *this;
+    }
+
+    // 以下三个操作符对 insert_iterator 不起作用 (关闭功能)
+    // 三个操作符返回的都是 insert_iterator 自己
+    insert_iterator<Container>& operator*() { return *this; }
+    insert_iterator<Container>& operator++() { return *this; }
+    insert_iterator<Container>& operator++(int) { return *this; }
+};
+
+// 这是一个辅助函数, 帮助我们方便使用 insert_iterator
+template <class Container, class Iterator>
+inline insert_iterator<Container> inserter(Container& x, Iterator i)
+{
+    typedef typename Container::iterator iter;
+    return insert_iterator<Container>(x, iter(i));
+}
+
+} // namespace cstl
+
+#endif /* __STL_ITERATOR_H */
