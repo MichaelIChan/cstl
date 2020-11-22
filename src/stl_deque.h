@@ -5,6 +5,9 @@
 #include "stl_iterator.h"
 #include "stl_alloc.h"
 
+namespace cstl
+{
+
 inline size_t __deque_buf_size(size_t n, size_t sz)
 {
     return n != 0 ? n : (sz < 512 ? size_t(512 / sz) : size_t(1));
@@ -149,6 +152,7 @@ public:                         // Basic types
 
 public:
     typedef __deque_iterator<T, T&, T*, BufSiz> iterator;
+    typedef reverse_iterator<iterator>          reverse_iterator;
 
 public:                         // Basic accessors
 
@@ -160,6 +164,8 @@ public:                         // Basic accessors
 
     iterator begin() { return start; }
     iterator end() { return finish; }
+    reverse_iterator rbegin() { return reverse_iterator(finish); }
+    reverse_iterator rend() { return reverse_iterator(start); }
 
     reference operator[](size_type n)
     {
@@ -564,4 +570,6 @@ deque<T, Alloc, BufSize>::insert_aux(iterator pos, const value_type& x)
     return pos;
 }
 
-#endif
+} // namespace cstl
+
+#endif /* __STL_DEQUE_H */

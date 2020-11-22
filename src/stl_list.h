@@ -6,6 +6,9 @@
 #include "stl_iterator.h"
 #include "stl_alloc.h"
 
+namespace cstl
+{
+
 template <class T>
 struct __list_node {
     typedef void* void_pointer;
@@ -79,6 +82,7 @@ protected:
 public:
     typedef __list_iterator<T, T&, T*>             iterator;
     typedef __list_iterator<T, const T&, const T*> const_iterator;
+    typedef reverse_iterator<iterator>             reverse_iterator;
 
     typedef T                 value_type;
     typedef value_type*       pointer;
@@ -97,6 +101,8 @@ public:
 
     iterator begin() { return (link_type)((*node).next); }
     iterator end() { return node; }
+    reverse_iterator rbegin() { return reverse_iterator(end()); }
+    reverse_iterator rend() { return reverse_iterator(begin()); }
     bool empty() const { return node->next == node; }
     size_type size() const
     {
@@ -326,4 +332,6 @@ void list<T, Alloc>::sort()
     swap(counter[fill - 1]);
 }
 
-#endif
+} // namespace cstl
+
+#endif /* __STL_LIST_H */

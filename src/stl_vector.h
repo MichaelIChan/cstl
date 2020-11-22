@@ -1,22 +1,27 @@
-#ifndef __STL_LIST_H
-#define __STL_LIST_H
+#ifndef __STL_VECTOR_H
+#define __STL_VECTOR_H
 
 #include <utility>
 
 #include "stl_uninitialized.h"
+#include "stl_iterator.h"
 #include "stl_alloc.h"
+
+namespace cstl
+{
 
 template <class T, class Alloc = alloc>
 class vector {
 public:
     // vector 的嵌套型别定义
-    typedef T                 value_type;
-    typedef value_type*       pointer;
-    typedef value_type*       iterator;       // vector 的迭代器是普通指针
-    typedef const value_type* const_iterator;
-    typedef value_type&       reference;
-    typedef size_t            size_type;
-    typedef ptrdiff_t         difference_type;
+    typedef T                           value_type;
+    typedef value_type*                 pointer;
+    typedef value_type*                 iterator;       // vector 的迭代器是普通指针
+    typedef const value_type*           const_iterator;
+    typedef value_type&                 reference;
+    typedef size_t                      size_type;
+    typedef ptrdiff_t                   difference_type;
+    typedef reverse_iterator<iterator> reverse_iterator;
 
 protected:
     // 以下, simple_alloc 是 SGI STL 的空间配置器
@@ -46,6 +51,8 @@ protected:
 public:
     iterator begin() { return start;  }
     iterator end()   { return finish; }
+    reverse_iterator rbegin() { return reverse_iterator(end()); }
+    reverse_iterator rend() { return reverse_iterator(begin()); }
     size_type size() const { return size_type(end() - begin()); }
     size_type capacity() const 
     {
@@ -262,4 +269,6 @@ void vector<T, Alloc>::insert(iterator position, size_type n, const T& x)
     }
 }
 
-#endif
+} // namespace cstl
+
+#endif /* __STL_VECTOR_H */
