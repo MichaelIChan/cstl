@@ -129,188 +129,201 @@ inline void advance(InputIterator& i, Distance n)
 }
 
 #ifndef __STL_LIMITED_DEFAULT_TEMPLATES
-template <class _BidirectionalIterator, class _Tp, class _Reference = _Tp&, 
-          class _Distance = ptrdiff_t> 
+template <class BidirectionalIterator, class T, class Reference = T&, 
+          class Distance = ptrdiff_t> 
 #else
-template <class _BidirectionalIterator, class _Tp, class _Reference, 
-          class _Distance> 
+template <class BidirectionalIterator, class T, class Reference, 
+          class Distance> 
 #endif
 class reverse_bidirectional_iterator {
-    typedef reverse_bidirectional_iterator<_BidirectionalIterator, _Tp, 
-                                         _Reference, _Distance>  _Self;
+    typedef reverse_bidirectional_iterator<BidirectionalIterator, T, Reference, Distance> self;
 protected:
-    _BidirectionalIterator current;
+    BidirectionalIterator current;
 public:
     typedef bidirectional_iterator_tag iterator_category;
-    typedef _Tp                        value_type;
-    typedef _Distance                  difference_type;
-    typedef _Tp*                       pointer;
-    typedef _Reference                 reference;
+    typedef T                          value_type;
+    typedef Distance                   difference_type;
+    typedef T*                         pointer;
+    typedef Reference                  reference;
 
     reverse_bidirectional_iterator() {}
-    explicit reverse_bidirectional_iterator(_BidirectionalIterator __x)
-        : current(__x) {}
-    _BidirectionalIterator base() const { return current; }
-    _Reference operator*() const
+    explicit reverse_bidirectional_iterator(BidirectionalIterator x)
+        : current(x) { }
+    BidirectionalIterator base() const { return current; }
+    Reference operator*() const
     {
-        _BidirectionalIterator __tmp = current;
-        return *--__tmp;
+        BidirectionalIterator tmp = current;
+        return *--tmp;
     }
 #ifndef __SGI_STL_NO_ARROW_OPERATOR
     pointer operator->() const { return &(operator*()); }
 #endif /* __SGI_STL_NO_ARROW_OPERATOR */
-    _Self& operator++()
+    self& operator++()
     {
         --current;
         return *this;
     }
-    _Self operator++(int)
+    self operator++(int)
     {
-        _Self __tmp = *this;
+        self tmp = *this;
         --current;
-        return __tmp;
+        return tmp;
     }
-    _Self& operator--()
+    self& operator--()
     {
         ++current;
         return *this;
     }
-    _Self operator--(int)
+    self operator--(int)
     {
-        _Self __tmp = *this;
+        self tmp = *this;
         ++current;
-        return __tmp;
+        return tmp;
     }
 };
 
-template <class _Iterator>
-class reverse_iterator 
-{
+// 这是一个迭代器配接器(iterator adapter), 用来将某个迭代器逆反前进方向,
+// 使前进为后退, 后退为前进
+template <class Iterator>
+class reverse_iterator {
 protected:
-  _Iterator current;
+    Iterator current;       // 记录对应的正向迭代器
 public:
-  typedef typename iterator_traits<_Iterator>::iterator_category
-          iterator_category;
-  typedef typename iterator_traits<_Iterator>::value_type
-          value_type;
-  typedef typename iterator_traits<_Iterator>::difference_type
-          difference_type;
-  typedef typename iterator_traits<_Iterator>::pointer
-          pointer;
-  typedef typename iterator_traits<_Iterator>::reference
-          reference;
+    typedef typename iterator_traits<Iterator>::iterator_category iterator_category;
+    typedef typename iterator_traits<Iterator>::value_type        value_type;
+    typedef typename iterator_traits<Iterator>::difference_type   difference_type;
+    typedef typename iterator_traits<Iterator>::pointer           pointer;
+    typedef typename iterator_traits<Iterator>::reference         reference;
 
-  typedef _Iterator iterator_type;
-  typedef reverse_iterator<_Iterator> _Self;
+    typedef Iterator iterator_type;             // 代表正向迭代器
+    typedef reverse_iterator<Iterator> self;    // 代表逆向迭代器
 
 public:
-  reverse_iterator() {}
-  explicit reverse_iterator(iterator_type __x) : current(__x) {}
+    reverse_iterator() {}
+    // 下面这个 ctor 将 reverse_iterator 与某个迭代器 x 系结起来
+    explicit reverse_iterator(iterator_type x) : current(x) {}
 
-  reverse_iterator(const _Self& __x) : current(__x.current) {}
+    reverse_iterator(const self& x) : current(x.current) {}
 #ifdef __STL_MEMBER_TEMPLATES
-  template <class _Iter>
-  reverse_iterator(const reverse_iterator<_Iter>& __x)
-    : current(__x.base()) {}
+    template <class _Iter>
+    reverse_iterator(const reverse_iterator<_Iter>& x) : current(x.base()) {}
 #endif /* __STL_MEMBER_TEMPLATES */
     
-  iterator_type base() const { return current; }
-  reference operator*() const {
-    _Iterator __tmp = current;
-    return *--__tmp;
-  }
+    iterator_type base() const { return current; }
+    reference operator*() const
+    {
+        Iterator tmp = current;
+        return *--tmp;
+        // 以上为关键所在. 对逆向迭代器取值, 就是将 "对应的正迭代器" 后退一格而后取值
+    }
 #ifndef __SGI_STL_NO_ARROW_OPERATOR
-  pointer operator->() const { return &(operator*()); }
+    pointer operator->() const { return &(operator*()); }   // 意义同上
 #endif /* __SGI_STL_NO_ARROW_OPERATOR */
 
-  _Self& operator++() {
-    --current;
-    return *this;
-  }
-  _Self operator++(int) {
-    _Self __tmp = *this;
-    --current;
-    return __tmp;
-  }
-  _Self& operator--() {
-    ++current;
-    return *this;
-  }
-  _Self operator--(int) {
-    _Self __tmp = *this;
-    ++current;
-    return __tmp;
-  }
+    self& operator++()
+    {
+        --current;
+        return *this;
+    }
+    self operator++(int)
+    {
+        self tmp = *this;
+        --current;
+        return tmp;
+    }
+    self& operator--()
+    {
+        ++current;
+        return *this;
+    }
+    self operator--(int)
+    {
+        self tmp = *this;
+        ++current;
+        return tmp;
+    }
 
-  _Self operator+(difference_type __n) const {
-    return _Self(current - __n);
-  }
-  _Self& operator+=(difference_type __n) {
-    current -= __n;
-    return *this;
-  }
-  _Self operator-(difference_type __n) const {
-    return _Self(current + __n);
-  }
-  _Self& operator-=(difference_type __n) {
-    current += __n;
-    return *this;
-  }
-  reference operator[](difference_type __n) const { return *(*this + __n); }  
+    self operator+(difference_type n) const
+    {
+        return self(current - n);
+    }
+    self& operator+=(difference_type n)
+    {
+        current -= n;
+        return *this;
+    }
+    self operator-(difference_type n) const
+    {
+        return self(current + n);
+    }
+    self& operator-=(difference_type n)
+    {
+        current += n;
+        return *this;
+    }
+    // 注意, 下面第一个 * 和唯一一个 + 都会调用本类的 operator* 和 operator+, 第二个 * 则不会
+    reference operator[](difference_type n) const { return *(*this + n); }  
 }; 
  
-template <class _Iterator>
-inline bool operator==(const reverse_iterator<_Iterator>& __x, 
-                       const reverse_iterator<_Iterator>& __y) {
-  return __x.base() == __y.base();
+template <class Iterator>
+inline bool operator==(const reverse_iterator<Iterator>& x, 
+                       const reverse_iterator<Iterator>& y)
+{
+    return x.base() == y.base();
 }
 
-template <class _Iterator>
-inline bool operator<(const reverse_iterator<_Iterator>& __x, 
-                      const reverse_iterator<_Iterator>& __y) {
-  return __y.base() < __x.base();
+template <class Iterator>
+inline bool operator<(const reverse_iterator<Iterator>& x, 
+                      const reverse_iterator<Iterator>& y)
+{
+    return y.base() < x.base();
 }
 
 #ifdef __STL_FUNCTION_TMPL_PARTIAL_ORDER
 
-template <class _Iterator>
-inline bool operator!=(const reverse_iterator<_Iterator>& __x, 
-                       const reverse_iterator<_Iterator>& __y) {
-  return !(__x == __y);
+template <class Iterator>
+inline bool operator!=(const reverse_iterator<Iterator>& x, 
+                       const reverse_iterator<Iterator>& y)
+{
+    return !(x == y);
 }
 
-template <class _Iterator>
-inline bool operator>(const reverse_iterator<_Iterator>& __x, 
-                      const reverse_iterator<_Iterator>& __y) {
-  return __y < __x;
+template <class Iterator>
+inline bool operator>(const reverse_iterator<Iterator>& x, 
+                      const reverse_iterator<Iterator>& y)
+{
+    return y < x;
 }
 
-template <class _Iterator>
-inline bool operator<=(const reverse_iterator<_Iterator>& __x, 
-                       const reverse_iterator<_Iterator>& __y) {
-  return !(__y < __x);
+template <class Iterator>
+inline bool operator<=(const reverse_iterator<Iterator>& x, 
+                       const reverse_iterator<Iterator>& y)
+{
+    return !(y < x);
 }
 
-template <class _Iterator>
-inline bool operator>=(const reverse_iterator<_Iterator>& __x, 
-                      const reverse_iterator<_Iterator>& __y) {
-  return !(__x < __y);
+template <class Iterator>
+inline bool operator>=(const reverse_iterator<Iterator>& x,
+                       const reverse_iterator<Iterator>& y)
+{
+    return !(x < y);
 }
 
 #endif /* __STL_FUNCTION_TMPL_PARTIAL_ORDER */
 
-template <class _Iterator>
-inline typename reverse_iterator<_Iterator>::difference_type
-operator-(const reverse_iterator<_Iterator>& __x, 
-          const reverse_iterator<_Iterator>& __y) {
-  return __y.base() - __x.base();
+template <class Iterator>
+inline typename reverse_iterator<Iterator>::difference_type
+operator-(const reverse_iterator<Iterator>& x, const reverse_iterator<Iterator>& y)
+{
+    return y.base() - x.base();
 }
 
-template <class _Iterator>
-inline reverse_iterator<_Iterator> 
-operator+(typename reverse_iterator<_Iterator>::difference_type __n,
-          const reverse_iterator<_Iterator>& __x) {
-  return reverse_iterator<_Iterator>(__x.base() - __n);
+template <class Iterator>
+inline reverse_iterator<Iterator> 
+operator+(typename reverse_iterator<Iterator>::difference_type n, 
+          const reverse_iterator<Iterator>& x)
+{
+    return reverse_iterator<Iterator>(x.base() - n);
 }
 
 // 这是一个迭代器配接器(iterator adapter), 用来将某个迭代器的赋值(assign)
