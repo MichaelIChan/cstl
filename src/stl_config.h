@@ -449,6 +449,8 @@
 #   define explicit
 # endif
 
+#define __STL_EXPLICIT_FUNCTION_TMPL_ARGS
+
 # ifdef __STL_EXPLICIT_FUNCTION_TMPL_ARGS
 #   define __STL_NULL_TMPL_ARGS <>
 # else

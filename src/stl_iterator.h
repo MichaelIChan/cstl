@@ -1,7 +1,10 @@
 #ifndef __STL_ITERATOR_H
 #define __STL_ITERATOR_H
 
+#include <iostream>
 #include <cstddef>      // for ptrdiff_t
+
+#include "stl_config.h"
 
 namespace cstl
 {
@@ -433,6 +436,81 @@ inline insert_iterator<Container> inserter(Container& x, Iterator i)
     typedef typename Container::iterator iter;
     return insert_iterator<Container>(x, iter(i));
 }
+
+// 这是一个 input iterator, 能够为 "来自某一 basic_istream" 的对象执行格式化输入操作.
+template <class T, class Distance = ptrdiff_t>
+class istream_iterator {
+    friend bool operator== __STL_NULL_TMPL_ARGS (const istream_iterator<T, Distance>& x,
+                                                 const istream_iterator<T, Distance>& y);
+protected:
+    std::istream* stream;
+    T value;
+    bool end_market;
+    void read()
+    {
+        end_market = (*stream) ? true : false;
+        if (end_market) *stream >> value;
+        // 以上, 输入之后, stream 的状态可能改变, 所以下面再判断一次以决定 end_marker
+        // 当读到 eof 或读到型别不符的资料, stream 即处于 false 状态
+        end_market = (*stream) ? true : false;
+    }
+public:
+    typedef input_iterator_tag iterator_category;
+    typedef T                  value_type;
+    typedef Distance           difference_type;
+    typedef const T*           pointer;
+    typedef const T&           reference;
+    // 以上, 因身为 input iterator, 所以采用 const 比较保险
+
+    istream_iterator() : stream(&std::cin), end_market(false) { }
+    istream_iterator(std::istream& s) : stream(&s) { read(); }
+
+    reference operator*() const { return value; }
+    pointer operator->() const { return &(operator*()); }
+
+    istream_iterator<T, Distance>& operator++()
+    {
+        read();
+        return *this;
+    }
+
+    istream_iterator<T, Distance>& operator++(int)
+    {
+        istream_iterator<T, Distance> tmp = *this;
+        read();
+        return tmp;
+    }
+}; /* istream_iterator */
+
+// 这是一个 output iterator, 能够将对象格式化输出到某个 basic_istream 上
+template <class T>
+class ostream_iterator {
+protected:
+    std::ostream* stream;
+    const char* string;     // 每次输出后的间符号
+
+public:
+    typedef output_iterator_tag iterator_category;
+    typedef void                value_type;
+    typedef void                difference_type;
+    typedef void                pointer;
+    typedef void                reference;
+
+    ostream_iterator(std::ostream& s) : stream(&s), string(0) { }
+    ostream_iterator(std::ostream& s, const char* c) : stream(&s), string(c) { }
+
+    // 对迭代器做赋值操作, 就代表要输出一笔资料
+    ostream_iterator<T>& operator=(const T& value)
+    {
+        *stream << value;               // 输出数据
+        if (string) *stream << string;  // 如果间隔符号不为空, 输出间隔符号
+        return *this;
+    }
+
+    ostream_iterator<T>& operator*() { return *this; }
+    ostream_iterator<T>& operator++() { return *this; }
+    ostream_iterator<T>& operator++(int) { return *this; }
+}; /* ostream_iterator */
 
 } // namespace cstl
 
