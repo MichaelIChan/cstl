@@ -518,7 +518,7 @@ public:
 //  (mem_fun1 and mem_fun1_ref are no longer part of the C++ standard,
 //  but they are provided for backward compatibility.)
 
-
+// "无任何参数", "通过 pointer 调用", "non-const 成员函数"
 template <class Ret, class T>
 class mem_fun_t : public unary_function<T*,Ret> {
 public:
@@ -528,6 +528,7 @@ private:
     Ret (T::*f)();
 };
 
+// "无任何参数", "通过 pointer 调用", "const 成员函数"
 template <class Ret, class T>
 class const_mem_fun_t : public unary_function<const T*,Ret> {
 public:
@@ -538,6 +539,7 @@ private:
 };
 
 
+// "无任何参数", "通过 reference 调用", "non-const 成员函数"
 template <class Ret, class T>
 class mem_fun_ref_t : public unary_function<T,Ret> {
 public:
@@ -547,6 +549,7 @@ private:
     Ret (T::*f)();
 };
 
+// "无任何参数", "通过 reference 调用", "const 成员函数"
 template <class Ret, class T>
 class const_mem_fun_ref_t : public unary_function<T, Ret> {
 public:
@@ -556,6 +559,7 @@ private:
     Ret (T::*f)() const;
 };
 
+// "有一个参数", "通过 pointer 调用", "non-const 成员函数"
 template <class Ret, class T, class Arg>
 class mem_fun1_t : public binary_function<T*,Arg, Ret> {
 public:
@@ -565,6 +569,7 @@ private:
     Ret (T::*f)(Arg);
 };
 
+// "有一个参数", "通过 pointer 调用", "const 成员函数"
 template <class Ret, class T, class Arg>
 class const_mem_fun1_t : public binary_function<const T*,Arg, Ret> {
 public:
@@ -574,6 +579,7 @@ private:
     Ret (T::*f)(Arg) const;
 };
 
+// "有一个参数", "通过 reference 调用", "non-const 成员函数"
 template <class Ret, class T, class Arg>
 class mem_fun1_ref_t : public binary_function<T,Arg, Ret> {
 public:
@@ -583,6 +589,7 @@ private:
     Ret (T::*f)(Arg);
 };
 
+// "有一个参数", "通过 reference 调用", "const 成员函数"
 template <class Ret, class T, class Arg>
 class const_mem_fun1_ref_t : public binary_function<T,Arg, Ret> {
 public:
